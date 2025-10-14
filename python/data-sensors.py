@@ -29,10 +29,10 @@ headers = {
     'X-API-Key': api_key  
 }
 
-def sleep_by_rate(resp):
+def sleep_by_rate(api_response):
     """Rate-limit of OpenAQ (60/min, 2000/hour)"""
-    remaining = int(resp.headers.get("x-ratelimit-remaining", "60") or 60)
-    reset = int(resp.headers.get("x-ratelimit-reset", "1") or 1)
+    remaining = int(api_response.headers.get("x-ratelimit-remaining", "60") or 60)
+    reset = int(api_response.headers.get("x-ratelimit-reset", "1") or 1)
     
     if remaining <= 0:
         print(f"Rate limit reached. waiting {reset}s ...")
