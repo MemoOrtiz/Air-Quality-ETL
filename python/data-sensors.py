@@ -1,5 +1,6 @@
 import os
 import time
+import json
 from datetime import datetime, timezone
 from dotenv import load_dotenv
 import requests
@@ -90,3 +91,26 @@ def fetch_sensors_for_location(location_id, limit=1000):
             break
         page += 1
     return sensors
+
+def fetch_measurements_for_sensor(sensor_id, datetime_from, datetime_to, limit=1000, out_folder="."):
+    page = 1
+    total = 0
+    while True:
+        params = {
+            "datetime_from": datetime_from,
+            "datetime_to": datetime_to,
+            "limit": limit,
+            "page": page
+        }
+        request_measurements = get(f"{API_BASE}/sensors/{sensor_id}/measurements", params=params)
+        js = request_measurements.json()
+        results = js.get("results", [])
+        # Guardar crudo por página
+        with open(os.path.join(out_folder, f"sensor-{sensor_id}_page-{page}.json"),
+                  "w", encoding="utf-8") as f:
+            json.dump(js, f, ensure_ascii=False)
+        total += len(results)
+        if len(results) < limit:
+            break
+        page += 1
+    return total
