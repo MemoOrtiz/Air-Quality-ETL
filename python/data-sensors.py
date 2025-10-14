@@ -57,3 +57,22 @@ def get(url, params=None, max_retries=5):
         time.sleep(2)
     request.raise_for_status()
     return request
+
+def fetch_locations_bbox(bbox, limit=1000):
+    lonW, latS, lonE, latN = bbox
+    page = 1
+    results = []
+    while True:
+        params = {
+            "bbox": f"{lonW},{latS},{lonE},{latN}",
+            "limit": limit,
+            "page": page
+        }
+
+        request_location = get(f"{API_BASE}/locations", params=params)
+        chunk = request_location.json().get("results", [])
+        results.extend(chunk)
+        if len(chunk) < limit:
+            break
+        page += 1
+    return results
