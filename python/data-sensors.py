@@ -76,3 +76,17 @@ def fetch_locations_bbox(bbox, limit=1000):
             break
         page += 1
     return results
+
+
+def fetch_sensors_for_location(location_id, limit=1000):
+    page = 1
+    sensors = []
+    while True:
+        request_sensors = get(f"{API_BASE}/locations/{location_id}/sensors",
+                params={"limit": limit, "page": page})
+        chunk = request_sensors.json().get("results", [])
+        sensors.extend(chunk)
+        if len(chunk) < limit:
+            break
+        page += 1
+    return sensors
