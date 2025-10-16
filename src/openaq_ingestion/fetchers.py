@@ -35,7 +35,6 @@ def fetch_measurements_for_sensor(sensor_id: int, dt_from: str, dt_to: str,
         r = get(f"{API_BASE}/sensors/{sensor_id}/measurements", params=params)
         js = r.json()
         results = js.get("results", [])
-        # CAMBIO: usar build_out_folder en lugar de out_folder simple
         out_folder = build_out_folder(base_dir, zone, sensor_id, ingest_date)
         
         with open(os.path.join(out_folder, f"sensor-{sensor_id}_page-{page}.json"), "w", encoding="utf-8") as f:
@@ -55,8 +54,8 @@ def fetch_measurements_for_sensor_raw(sensor_id: int, dt_from: str, dt_to: str, 
         js = r.json()
         results = js.get("results", [])
         
-        pages.append(js)  # Acumular páginas en memoria
+        pages.append(js)  # Accumulate pages in memory
         
         if len(results) < limit: break
         page += 1
-    return pages  # Devolver todas las páginas
+    return pages  # Return all pages
