@@ -80,5 +80,49 @@ def run_zone_etl(zone_name: str, bbox: tuple, dt_from: str, dt_to: str, storage:
     except Exception as e:
         print(f"\nFatal error processing zone {zone_name}: {e}")
         zone_stats['errors'] += 1
-    
+    # ========= PASO 2: SENSORS =========
+        print("\n [2/3] Loading sensors for each location...")
+        all_sensors = []
+        
+        for i, location in enumerate(locations, 1):
+            loc_id = location.get("id")
+            loc_name = location.get("name", "Unknown")
+            city = location.get("city", "Unknown")
+            
+            print(f"   [{i:2d}/{len(locations)}] {loc_name} (ID: {loc_id})")
+            
+            try:
+                # Obtain sensors using fetchers
+                sensors = fetch_sensors_for_location(loc_id)
+                print(f"      → {len(sensors)} sensors found")
+
+                # Save sensors for this location using storage
+                storage.save_sensors_for_location(zone_name, loc_id, sensors, ingest_date)
+
+                # Prepare consolidated index
+                for sensor in sensors:
+                    sensor_info = {
+                        "locationId": loc_id,
+                        "locationName": loc_name,
+                        "city": city,
+                        "provider": location.get("provider", "Unknown"),
+                        "sensorId": sensor.get("id"),
+                        "parameter": (sensor.get("parameter") or {}).get("name", "Unknown"),
+                        "units": (sensor.get("parameter") or {}).get("units", "Unknown"),
+                        "datetimeFirst": sensor.get("datetimeFirst"),
+                        "datetimeLast": sensor.get("datetimeLast"),
+                    }
+                    all_sensors.append(sensor_info)
+                    
+            except Exception as e:
+                print(f"       Error loading sensors: {e}")
+                zone_stats['errors'] += 1
+                continue
+        
+        zone_stats['sensors'] = len(all_sensors)
+        
+        # Save consolidated sensors index using storage
+        storage.save_sensors_index(zone_name, all_sensors, ingest_date)
+        print(f"   Saved: sensors_index.json ({len(all_sensors)} total sensors)")
+
     return zone_stats
