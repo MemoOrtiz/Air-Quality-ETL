@@ -61,4 +61,24 @@ def run_zone_etl(zone_name: str, bbox: tuple, dt_from: str, dt_to: str, storage:
         'measurements': 0,
         'errors': 0
     }
+    try:
+        # ========= PASO 1: LOCATIONS =========
+        print("[1/3] Loading locations...")
+        locations = fetch_locations_bbox(bbox)
+        zone_stats['locations'] = len(locations)
+        
+        if not locations:
+            print("    No locations found in this area. Skipping zone.")
+            return zone_stats
+
+        print(f"   {len(locations)} locations found")
+
+        # Save locations using storage
+        storage.save_locations_index(zone_name, locations, ingest_date)
+        print(f"   Saved: locations_index.json")
     
+    except Exception as e:
+        print(f"\nFatal error processing zone {zone_name}: {e}")
+        zone_stats['errors'] += 1
+    
+    return zone_stats
