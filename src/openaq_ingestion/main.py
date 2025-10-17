@@ -35,3 +35,10 @@ def load_zones_config(path: str):
         print(f"Error JSON in {path}: {e}")
         sys.exit(1)
 
+def print_header():
+    """Initial Banner ETL"""
+    print("-" * 58)
+    print("    OpenAQ ETL - Air Quality Data Extraction")
+    print("-" * 58)
+
+
