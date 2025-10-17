@@ -41,4 +41,24 @@ def print_header():
     print("    OpenAQ ETL - Air Quality Data Extraction")
     print("-" * 58)
 
+def run_zone_etl(zone_name: str, bbox: tuple, dt_from: str, dt_to: str, storage: RawLocal, ingest_date: str):
+    """
+    Run the ETL process for a specific zone:
+    1. Fetch locations (fetchers)
+    2. Fetch sensors (fetchers)  
+    3. Fetch measurements (fetchers)
+    4. Save everything locally (storage)
+    """
 
+    print(f"\nProcessing zone: {zone_name}")
+    print(f"Geographic area: {bbox}")
+    print(f"Time range: {dt_from} → {dt_to}")
+    print("-" * 60)
+    
+    zone_stats = {
+        'locations': 0,
+        'sensors': 0, 
+        'measurements': 0,
+        'errors': 0
+    }
+    
