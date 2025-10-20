@@ -218,3 +218,34 @@ Usage examples:
     )
     
     return parser.parse_args()
+
+def main():
+    """Main ETL function"""
+    
+    print_header()
+
+    # Load configuration
+    load_env()
+    args = parse_arguments()
+    
+    print(f"API OpenAQ: {API_BASE}")
+    print(f"Page limit: {PAGE_LIMIT_DEFAULT}")
+    print(f"Base directory: {args.out_base}")
+    print(f"Ingest date: {ingest_date_utc()}")
+    print()
+
+    # Load zones
+    zones = load_zones_config(args.zones)
+    # Filter specific zone if specified
+    if args.zone:
+        zones = [z for z in zones if z["name"] == args.zone]
+        if not zones:
+            print(f"Error: Zone '{args.zone}' not found in {args.zones}")
+            available_zones = [z["name"] for z in load_zones_config(args.zones)]
+            print(f"Available zones: {', '.join(available_zones)}")
+            sys.exit(1)
+
+    print(f"Zones to process: {len(zones)}")
+    for zone in zones:
+        print(f"    • {zone['name']}: {zone['bbox']}")
+    print()
