@@ -161,4 +161,8 @@ def run_zone_etl(zone_name: str, bbox: tuple, dt_from: str, dt_to: str, storage:
                 continue
 
         print(f"\nZone {zone_name} completed successfully")
+    except Exception as e:
+        print(f"\nFatal error processing zone {zone_name}: {e}")
+        zone_stats['errors'] += 1
+    
     return zone_stats
