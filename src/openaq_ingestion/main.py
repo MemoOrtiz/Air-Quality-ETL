@@ -166,3 +166,55 @@ def run_zone_etl(zone_name: str, bbox: tuple, dt_from: str, dt_to: str, storage:
         zone_stats['errors'] += 1
     
     return zone_stats
+
+def parse_arguments():
+    """CLI arguments configuration"""
+    parser = argparse.ArgumentParser(
+        description="OpenAQ ETL - Air Quality Data Extraction",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Usage examples:
+  # Full ETL for all zones
+  python -m src.openaq_ingestion.main --from 2025-09-01T00:00:00Z --to 2025-10-15T23:59:59Z
+
+  # Only a specific zone
+  python -m src.openaq_ingestion.main --zone Monterrey_ZMM --from 2025-09-01T00:00:00Z --to 2025-10-15T23:59:59Z
+
+  # Specify output directory
+  python -m src.openaq_ingestion.main --from 2025-09-01T00:00:00Z --to 2025-10-15T23:59:59Z --out ./mi_data
+        """
+    )
+    
+    parser.add_argument(
+        "--zones", 
+        default="./src/scripts/zones_config.json",
+        help="File of zone configuration (default: ../scripts/zones_config.json)"
+    )
+    
+    parser.add_argument(
+        "--zone", 
+        help="Process only this specific zone (by name)"
+    )
+    
+    parser.add_argument(
+        "--from", 
+        dest="dt_from", 
+        required=True,
+        help="Start date/time in ISO format (e.g., 2025-09-01T00:00:00Z)"
+    )
+    
+    parser.add_argument(
+        "--to", 
+        dest="dt_to", 
+        required=True,
+        help="End date/time in ISO format (e.g., 2025-10-15T23:59:59Z)"
+    )
+    
+    parser.add_argument(
+        "--out", 
+        dest="out_base", 
+        default=out_dir(),
+        help=f"Base output directory (default: {out_dir()})"
+    )
+    
+    return parser.parse_args()
