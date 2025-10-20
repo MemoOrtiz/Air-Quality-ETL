@@ -249,3 +249,16 @@ def main():
     for zone in zones:
         print(f"    • {zone['name']}: {zone['bbox']}")
     print()
+    
+    # Initialize storage
+    storage = RawLocal(base=args.out_base)
+    ingest_date = ingest_date_utc()
+
+    # Global statistics
+    total_stats = {
+        'zones': len(zones),
+        'locations': 0,
+        'sensors': 0,
+        'measurements': 0,
+        'errors': 0
+    }
