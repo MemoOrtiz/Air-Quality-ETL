@@ -249,7 +249,7 @@ def main():
     for zone in zones:
         print(f"    • {zone['name']}: {zone['bbox']}")
     print()
-    
+
     # Initialize storage
     storage = RawLocal(base=args.out_base)
     ingest_date = ingest_date_utc()
@@ -262,3 +262,62 @@ def main():
         'measurements': 0,
         'errors': 0
     }
+
+    # Process each zone
+    try:
+        for zone in zones:
+            zone_stats = run_zone_etl(
+                zone_name=zone["name"],
+                bbox=tuple(zone["bbox"]),
+                dt_from=args.dt_from,
+                dt_to=args.dt_to,
+                storage=storage,
+                ingest_date=ingest_date
+            )
+
+            # Accumulate statistics
+            for key in ['locations', 'sensors', 'measurements', 'errors']:
+                total_stats[key] += zone_stats[key]
+
+        # ------- FINAL SUMMARY --------
+        print("\n Complete")
+        print("-" * 40)
+        print("\nFinal statistics:")
+        print(f"Processed zones: {total_stats['zones']}")
+        print(f"Total locations: {total_stats['locations']}")
+        print(f"Total sensors: {total_stats['sensors']}")
+        print(f"Total measurements: {total_stats['measurements']}")
+        if total_stats['errors'] > 0:
+            print(f"Errors: {total_stats['errors']}")
+        print(f"Ingest date: {ingest_date}")
+        
+        print(f"\nGeneral Structure save in: {args.out_base}/")
+        for zone in zones:
+            zone_name = zone["name"]
+            print(f"   {zone_name}/")
+            print(f"   ├── metadata/ingest_date={ingest_date}/")
+            print(f"   │   ├── locations_index.json")
+            print(f"   │   ├── sensors_loc-*.json") 
+            print(f"   │   └── sensors_index.json")
+            print(f"   └── measurements/ingest_date={ingest_date}/sensor_id=*/")
+            print(f"       └── sensor-*_page-*.json")
+        
+        print("-" * 40)
+        
+        if total_stats['errors'] > 0:
+            print(f" Proceso completado con {total_stats['errors']} errores")
+            sys.exit(1)
+        else:
+            print("Process completed successfully")
+            
+    except KeyboardInterrupt:
+        print("\nETL interrumped by user")
+        sys.exit(1)
+    except Exception as e:
+        print(f"\nFatal error:: {e}")
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()
