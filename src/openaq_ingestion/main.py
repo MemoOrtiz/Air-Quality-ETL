@@ -80,6 +80,7 @@ def run_zone_etl(zone_name: str, bbox: tuple, dt_from: str, dt_to: str, storage:
     except Exception as e:
         print(f"\nFatal error processing zone {zone_name}: {e}")
         zone_stats['errors'] += 1
+
     # ========= PASO 2: SENSORS =========
         print("\n [2/3] Loading sensors for each location...")
         all_sensors = []
@@ -124,5 +125,40 @@ def run_zone_etl(zone_name: str, bbox: tuple, dt_from: str, dt_to: str, storage:
         # Save consolidated sensors index using storage
         storage.save_sensors_index(zone_name, all_sensors, ingest_date)
         print(f"   Saved: sensors_index.json ({len(all_sensors)} total sensors)")
+         # ========= STEP 3: MEASUREMENTS =========
+        print(f"\n[3/3] Loading measurements from {len(all_sensors)} sensors...")
 
+        for i, sensor_info in enumerate(all_sensors, 1):
+            sensor_id = sensor_info["sensorId"]
+            parameter = sensor_info["parameter"]
+            location_name = sensor_info["locationName"]
+            
+            print(f"   [{i:2d}/{len(all_sensors)}] Sensor {sensor_id} ({parameter}) - {location_name}")
+            
+            try:
+                # Obtain measurements using fetchers (raw version)
+                pages_data = fetch_measurements_for_sensor_raw(
+                    sensor_id=sensor_id,
+                    dt_from=dt_from,
+                    dt_to=dt_to
+                )
+                
+                if pages_data:
+                    # SAVE THE DATA USING "storage/local_fs.py"
+                    storage.save_measurements_pages(zone_name, sensor_id, pages_data, ingest_date)
+
+                    # Count total measurements
+                    measurements_count = sum(len(page.get("results", [])) for page in pages_data)
+                    zone_stats['measurements'] += measurements_count
+
+                    print(f"    -> {measurements_count} measurements in {len(pages_data)} pages")
+                else:
+                    print(f"    -> No data in the specified range")
+
+            except Exception as e:
+                print(f"      Error: {e}")
+                zone_stats['errors'] += 1
+                continue
+
+        print(f"\nZone {zone_name} completed successfully")
     return zone_stats
