@@ -31,13 +31,15 @@ class RawLocal:
         p = os.path.join(self.metadata_dir(zone, ingest_date), "sensors_index.json")
         self.save_json(p, sensors_idx)
     
+    """
     def save_measurements_page(self, zone, sensor_id, page_data, page_num, ingest_date):
         folder = build_out_folder(self.base, zone, sensor_id, ingest_date)
         file_path = os.path.join(folder, f"sensor-{sensor_id}_page-{page_num}.json")
         self.save_json(file_path, page_data)
-        
+    """    
     def save_measurements_pages(self, zone, sensor_id, pages_data, ingest_date):
+        #Build out folder comes from utils
+        folder = build_out_folder(self.base, zone, sensor_id, ingest_date)
         for page_num, page_data in enumerate(pages_data, 1):
-            folder = build_out_folder(self.base, zone, sensor_id, ingest_date)
             file_path = os.path.join(folder, f"sensor-{sensor_id}_page-{page_num}.json")
             self.save_json(file_path, page_data)
