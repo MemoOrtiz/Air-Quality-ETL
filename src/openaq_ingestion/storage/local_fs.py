@@ -21,7 +21,11 @@ class RawLocal:
 
     def save_locations_index(self, zone, locations, ingest_date):
         p = os.path.join(self.metadata_dir(zone, ingest_date), "locations_index.json")
-        self.save_json(p, {"results": locations})
+        # Only if it doesn't exist
+        if not os.path.exists(p):
+            self.save_json(p, {"results": locations})
+            return True  # created
+        return False  # already exists
 
     def save_sensors_for_location(self, zone, loc_id, sensors, ingest_date):
         p = os.path.join(self.metadata_dir(zone, ingest_date), f"sensors_loc-{loc_id}.json")
