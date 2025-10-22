@@ -1,7 +1,7 @@
 # src/openaq_ingestion/fetchers.py
 import os, json
 from .api import get
-from .config import API_BASE, PAGE_LIMIT_DEFAULT
+from .config import api_base, PAGE_LIMIT_DEFAULT
 from .utils import build_out_folder
 
 def fetch_locations_bbox(bbox: tuple, limit=PAGE_LIMIT_DEFAULT):
@@ -9,7 +9,7 @@ def fetch_locations_bbox(bbox: tuple, limit=PAGE_LIMIT_DEFAULT):
     page, results = 1, []
     while True:
         params = {"bbox": f"{lonW},{latS},{lonE},{latN}", "limit": limit, "page": page}
-        r = get(f"{API_BASE}/locations", params=params)
+        r = get(f"{api_base()}/locations", params=params)
         chunk = r.json().get("results", [])
         results.extend(chunk)
         if len(chunk) < limit: break
@@ -19,7 +19,7 @@ def fetch_locations_bbox(bbox: tuple, limit=PAGE_LIMIT_DEFAULT):
 def fetch_sensors_for_location(location_id: int, limit=PAGE_LIMIT_DEFAULT):
     page, sensors = 1, []
     while True:
-        r = get(f"{API_BASE}/locations/{location_id}/sensors", params={"limit": limit, "page": page})
+        r = get(f"{api_base()}/locations/{location_id}/sensors", params={"limit": limit, "page": page})
         chunk = r.json().get("results", [])
         sensors.extend(chunk)
         if len(chunk) < limit: break
@@ -32,7 +32,7 @@ def fetch_measurements_for_sensor(sensor_id: int, dt_from: str, dt_to: str,
     page, total = 1, 0
     while True:
         params = {"datetime_from": dt_from, "datetime_to": dt_to, "limit": limit, "page": page}
-        r = get(f"{API_BASE}/sensors/{sensor_id}/measurements", params=params)
+        r = get(f"{api_base()}/sensors/{sensor_id}/measurements", params=params)
         js = r.json()
         results = js.get("results", [])
         out_folder = build_out_folder(base_dir, zone, sensor_id, ingest_date)
@@ -50,7 +50,7 @@ def fetch_measurements_for_sensor_raw(sensor_id: int, dt_from: str, dt_to: str, 
     page = 1
     while True:
         params = {"datetime_from": dt_from, "datetime_to": dt_to, "limit": limit, "page": page}
-        r = get(f"{API_BASE}/sensors/{sensor_id}/measurements", params=params)
+        r = get(f"{api_base()}/sensors/{sensor_id}/measurements", params=params)
         js = r.json()
         results = js.get("results", [])
         

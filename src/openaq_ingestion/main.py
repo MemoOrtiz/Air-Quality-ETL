@@ -14,7 +14,7 @@ import sys
 from datetime import datetime
 
 # Imports related to the project
-from .config import load_env, out_dir, API_BASE, PAGE_LIMIT_DEFAULT
+from .config import load_env, out_dir, api_base, PAGE_LIMIT_DEFAULT
 from .utils import ingest_date_utc, slugify
 from .fetchers import (
     fetch_locations_bbox,
@@ -228,7 +228,7 @@ def main():
     load_env()
     args = parse_arguments()
     
-    print(f"API OpenAQ: {API_BASE}")
+    print(f"API OpenAQ: {api_base()}")
     print(f"Page limit: {PAGE_LIMIT_DEFAULT}")
     print(f"Base directory: {args.out_base}")
     print(f"Ingest date: {ingest_date_utc()}")
