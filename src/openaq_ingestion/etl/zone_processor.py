@@ -136,14 +136,19 @@ class ZoneProcessor:
                 )
                 
                 if pages_data:
-                    # Save using storage
+                    # Save pages in the pages/ directory
                     self.storage.save_measurements_pages(zone_name, sensor_id, pages_data, ingest_date)
+                    
+                    # NEW: Organize by event date and save in event_date/ directory
+                    measurements_by_date = self._organize_by_event_date(pages_data)
+                    self.storage.save_measurements_by_event_date(zone_name, sensor_id, measurements_by_date)
                     
                     # Count total measurements
                     measurements_count = sum(len(page.get("results", [])) for page in pages_data)
                     total_measurements += measurements_count
                     
                     print(f"    -> {measurements_count} measurements in {len(pages_data)} pages")
+                    print(f"       Organized by {len(measurements_by_date)} event dates")
                 else:
                     print(f"    -> No data in the specified range")
                     

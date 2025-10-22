@@ -2,7 +2,6 @@
 import os, json
 from ..core.api import get
 from ..core.config import api_base, PAGE_LIMIT_DEFAULT
-from ..utils.helpers import build_out_folder
 
 def fetch_locations_bbox(bbox: tuple, limit=PAGE_LIMIT_DEFAULT):
     lonW, latS, lonE, latN = bbox
@@ -25,24 +24,6 @@ def fetch_sensors_for_location(location_id: int, limit=PAGE_LIMIT_DEFAULT):
         if len(chunk) < limit: break
         page += 1
     return sensors
-
-def fetch_measurements_for_sensor(sensor_id: int, dt_from: str, dt_to: str,
-                                  zone: str, ingest_date: str,
-                                  limit=PAGE_LIMIT_DEFAULT, base_dir: str = "./raw_openaq") -> int:
-    page, total = 1, 0
-    while True:
-        params = {"datetime_from": dt_from, "datetime_to": dt_to, "limit": limit, "page": page}
-        r = get(f"{api_base()}/sensors/{sensor_id}/measurements", params=params)
-        js = r.json()
-        results = js.get("results", [])
-        out_folder = build_out_folder(base_dir, zone, sensor_id, ingest_date)
-        
-        with open(os.path.join(out_folder, f"sensor-{sensor_id}_page-{page}.json"), "w", encoding="utf-8") as f:
-            json.dump(js, f, ensure_ascii=False)
-        total += len(results)
-        if len(results) < limit: break
-        page += 1
-    return total
 
 def fetch_measurements_for_sensor_raw(sensor_id: int, dt_from: str, dt_to: str, limit=PAGE_LIMIT_DEFAULT):
     """Only fetch data, DO NOT save it"""
