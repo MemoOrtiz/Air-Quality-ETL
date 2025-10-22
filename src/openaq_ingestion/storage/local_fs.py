@@ -29,12 +29,18 @@ class RawLocal:
 
     def save_sensors_for_location(self, zone, loc_id, sensors, ingest_date):
         p = os.path.join(self.metadata_dir(zone, ingest_date), f"sensors_loc-{loc_id}.json")
-        self.save_json(p, {"results": sensors})
+        if not os.path.exists(p):
+            self.save_json(p, {"results": sensors})
+            return True  # created
+        return False  # already exists
 
     def save_sensors_index(self, zone, sensors_idx, ingest_date):
         p = os.path.join(self.metadata_dir(zone, ingest_date), "sensors_index.json")
-        self.save_json(p, sensors_idx)
-    
+        if not os.path.exists(p):
+            self.save_json(p, sensors_idx)
+            return True  # created
+        return False  # already exists
+
     """
     def save_measurements_page(self, zone, sensor_id, page_data, page_num, ingest_date):
         folder = build_out_folder(self.base, zone, sensor_id, ingest_date)
