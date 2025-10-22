@@ -1,7 +1,7 @@
 #local_fs = local file system
-# src/openaq_ingestion/storage/local_fs.py
+# src/openaq_ingestion/data/storage/local_fs.py
 import os, json
-from ..utils import build_out_folder, ensure_dir
+from ...utils.helpers import build_out_folder, ensure_dir
 
 class RawLocal:
     def __init__(self, base="./raw_openaq"):

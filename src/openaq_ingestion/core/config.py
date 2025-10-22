@@ -1,4 +1,4 @@
-# src/openaq_ingestion/config.py
+# src/openaq_ingestion/core/config.py
 import os
 from dotenv import load_dotenv
 

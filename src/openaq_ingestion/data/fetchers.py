@@ -1,8 +1,8 @@
-# src/openaq_ingestion/fetchers.py
+# src/openaq_ingestion/data/fetchers.py
 import os, json
-from .api import get
-from .config import api_base, PAGE_LIMIT_DEFAULT
-from .utils import build_out_folder
+from ..core.api import get
+from ..core.config import api_base, PAGE_LIMIT_DEFAULT
+from ..utils.helpers import build_out_folder
 
 def fetch_locations_bbox(bbox: tuple, limit=PAGE_LIMIT_DEFAULT):
     lonW, latS, lonE, latN = bbox
@@ -45,7 +45,7 @@ def fetch_measurements_for_sensor(sensor_id: int, dt_from: str, dt_to: str,
     return total
 
 def fetch_measurements_for_sensor_raw(sensor_id: int, dt_from: str, dt_to: str, limit=PAGE_LIMIT_DEFAULT):
-    """SOLO obtiene datos, NO los guarda"""
+    """Only fetch data, DO NOT save it"""
     pages = []
     page = 1
     while True:
