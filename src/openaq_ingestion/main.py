@@ -5,7 +5,6 @@ Simplified entry point using modular architecture
 Usage:
     python -m src.openaq_ingestion.main --from 2025-09-01T00:00:00Z --to 2025-10-15T23:59:59Z
     python -m src.openaq_ingestion.main --zone Monterrey_ZMM --from 2025-09-01T00:00:00Z --to 2025-10-15T23:59:59Z
-    #python -m openaq_ingestion.main --from 2025-09-01T00:00:00Z --to 2025-10-15T23:59:59Z --zone Monterrey_ZMM
 """
 
 from .core.config import load_env
@@ -22,7 +21,7 @@ def main():
     
     # Initialize orchestrator
     orchestrator = DataIngestionOrchestrator(
-        zones_config_path=args.zones_config,
+        zones_config_path=args.zones,
         output_dir=args.out_base,
         target_zone=args.zone
     )
