@@ -157,3 +157,42 @@ class ZoneProcessor:
                 continue
         
         return total_measurements
+    
+    def _organize_by_event_date(self, pages_data: list) -> dict:
+        """
+        Organize measurements by event date (the date when the measurement was taken)
+        
+        Args:
+            pages_data: List of page responses from API
+            
+        Returns:
+            Dict with event_date as key and list of measurements as value
+            Example: {'2025-10-01': [measurement1, measurement2], '2025-10-02': [...]}
+        """
+        measurements_by_date = {}
+        
+        for page in pages_data:
+            measurements = page.get("results", [])
+            
+            for measurement in measurements:
+                # Extract event date from measurement
+                # API returns: {"period": {"datetimeFrom": {"utc": "2025-09-17T00:00:00Z", "local": "..."}}}
+                period_info = measurement.get("period", {})
+                datetime_from = period_info.get("datetimeFrom", {})
+                event_datetime = datetime_from.get("utc", "")
+                
+                if event_datetime:
+                    # Extract just the date part: 2025-09-17
+                    event_date = event_datetime[:10]  # "2025-09-17T00:00:00Z" -> "2025-09-17"
+                    
+                    if event_date not in measurements_by_date:
+                        measurements_by_date[event_date] = []
+                    
+                    measurements_by_date[event_date].append(measurement)
+                else:
+                    # Handle measurements without proper date
+                    if "unknown_date" not in measurements_by_date:
+                        measurements_by_date["unknown_date"] = []
+                    measurements_by_date["unknown_date"].append(measurement)
+        
+        return measurements_by_date
