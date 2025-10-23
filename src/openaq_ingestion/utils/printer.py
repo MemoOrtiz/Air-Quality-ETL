@@ -40,12 +40,15 @@ def print_final_summary(total_stats: dict, zones: list, output_dir: str, ingest_
     for zone in zones:
         zone_name = zone["name"]
         print(f" {zone_name}/")
-        print(f"   ├──  metadata/ingest_date={ingest_date}/")
-        print(f"   │   ├──  locations_index.json")
-        print(f"   │   ├──  sensors_loc-*.json")
-        print(f"   │   └──  sensors_index.json")
-        print(f"   └──  measurements/ingest_date={ingest_date}/sensor_id=*/")
-        print(f"       └──  sensor-*_page-*.json")
+        print(f"   ├──  measurements/")
+        print(f"   │   ├──  pages/ingest_date={ingest_date}/sensor_id=*/")
+        print(f"   │   │   └──  sensor-*_page-*.json")
+        print(f"   │   └──  event_date/year=YYYY/month=MM/day=DD/sensor_id=*/")
+        print(f"   │       └──  sensor-*_YYYY-MM-DD.jsonl")
+        print(f"   └──  metadata/ingest_date={ingest_date}/")
+        print(f"       ├──  locations_index.json")
+        print(f"       ├──  sensors_loc-*.json")
+        print(f"       └──  sensors_index.json")
         print()
     
     print("-" * 40)
