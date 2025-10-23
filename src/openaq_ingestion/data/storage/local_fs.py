@@ -89,7 +89,21 @@ class RawLocal:
     def save_measurements_by_event_date(self, zone, sensor_id, measurements_by_date):
         """Save measurements organized by event date in JSONL format"""
         for event_date, measurements in measurements_by_date.items():
-            event_dir = self.measurements_event_date_dir(zone, sensor_id, event_date)
+            # Handle special case for unknown dates
+            if event_date == "unknown_date":
+                # Create a special directory for unknown dates
+                event_dir = os.path.join(
+                    self.zone_dir(zone), 
+                    "measurements", 
+                    "event_date",
+                    "unknown",
+                    f"sensor_id={sensor_id}"
+                )
+                ensure_dir(event_dir)
+            else:
+                # Use normal event date directory structure
+                event_dir = self.measurements_event_date_dir(zone, sensor_id, event_date)
+            
             file_path = os.path.join(event_dir, f"sensor-{sensor_id}_{event_date}.jsonl")
             
             with open(file_path, "w", encoding="utf-8") as f:
