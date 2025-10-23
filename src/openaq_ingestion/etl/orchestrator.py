@@ -29,7 +29,7 @@ class DataIngestionOrchestrator:
         # Process each zone
         try:
             for zone in zones:
-                zone_stats = self.processor.process_zone(
+                zone_stats = self.processor.extract_zone_data(
                     zone_name=zone["name"],
                     bbox=tuple(zone["bbox"]),
                     dt_from=dt_from,
@@ -93,8 +93,8 @@ class DataIngestionOrchestrator:
         print_final_summary(total_stats, zones, self.output_dir, ingest_date)
         
         if total_stats['errors'] > 0:
-            print(f"⚠️  Process completed with {total_stats['errors']} errors")
+            print(f" Process completed with {total_stats['errors']} errors")
             return False
         else:
-            print("✅ Process completed successfully")
+            print("Process completed successfully")
             return True
