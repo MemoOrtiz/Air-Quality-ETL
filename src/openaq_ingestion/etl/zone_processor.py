@@ -5,12 +5,12 @@ from ..data.fetchers import (
     fetch_sensors_for_location, 
     fetch_measurements_for_sensor_raw
 )
-from ..data.storage.local_fs import LocalStorage
+from ..data.storage.storage_interface import StorageInterface
 
 class ZoneProcessor:
     """Process individual zones for ETL operations"""
     
-    def __init__(self, storage: LocalStorage):
+    def __init__(self, storage: StorageInterface):
         self.storage = storage
     
     def extract_zone_data(self, zone_name: str, bbox: tuple, dt_from: str, dt_to: str, ingest_date: str) -> dict:
@@ -160,7 +160,7 @@ class ZoneProcessor:
                     total_measurements += measurements_count
                     
                     print(f"    -> {measurements_count} measurements in {len(pages_data)} pages")
-                    print(f"       Raw data saved to Bronze layer (no processing)")
+                    print(f"       Raw data saved to Bronze layer ")
                 else:
                     print(f"    -> No data in the specified range")
                     
