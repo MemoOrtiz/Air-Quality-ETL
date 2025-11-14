@@ -1,6 +1,8 @@
 # src/openaq_ingestion/etl/orchestrator.py
 from .zone_processor import ZoneProcessor
-from ..data.storage.local_fs import RawLocal
+from ..data.storage.local_fs import LocalStorage
+from ..data.storage.s3_storage import S3Storage
+from ..core.config import s3_bucket, s3_prefix, storage_mode
 from ..utils.config_loader import load_zones_config
 from ..utils.printer import print_header, print_final_summary
 from ..utils.helpers import ingest_date_utc
@@ -8,13 +10,39 @@ from ..utils.helpers import ingest_date_utc
 class DataIngestionOrchestrator:
     """Main ETL orchestration logic"""
     
-    def __init__(self, zones_config_path: str, output_dir: str, target_zone: str = None):
+    def __init__(self, zones_config_path: str, output_dir: str, target_zone: str = None,storage_type: str = None):
         self.zones_config_path = zones_config_path
         self.output_dir = output_dir
         self.target_zone = target_zone
-        self.storage = RawLocal(base=output_dir)
+        self.storage_type = storage_type
+
+        self.storage = self._initialize_storage()
         self.processor = ZoneProcessor(self.storage)
     
+    def _initialize_storage(self):
+        """Initialize storage backend based on configuration"""
+        # Determine mode: explicit choice or auto-detect
+        if self.storage_type:
+            mode = self.storage_type  # User explicitly chose
+        else:
+            mode = storage_mode()  # Auto-detect from .env
+        
+        if mode == "s3":
+            bucket = s3_bucket()
+            if not bucket:
+                raise ValueError(
+                    "S3 storage selected but S3_BUCKET_NAME not configured in .env\n"
+                    "Add: S3_BUCKET_NAME=your-bucket-name"
+                )
+            prefix = s3_prefix()
+            print(f"Storage mode: S3 (bucket: {bucket}, prefix: {prefix})")
+            return S3Storage(bucket_name=bucket, prefix=prefix)
+        else:
+            print(f"Storage mode: Local (directory: {self.output_dir})")
+            return LocalStorage(base=self.output_dir)
+            
+
+
     def run_etl(self, dt_from: str, dt_to: str) -> bool:
         """Run complete ETL process"""
         print_header()
