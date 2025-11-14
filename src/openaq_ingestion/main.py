@@ -23,7 +23,8 @@ def main():
     orchestrator = DataIngestionOrchestrator(
         zones_config_path=args.zones,
         output_dir=args.out_base,
-        target_zone=args.zone
+        target_zone=args.zone,
+        storage_type=args.storage
     )
     
     # Run the ETL process
