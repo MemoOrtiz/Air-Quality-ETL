@@ -5,12 +5,12 @@ from ..data.fetchers import (
     fetch_sensors_for_location, 
     fetch_measurements_for_sensor_raw
 )
-from ..data.storage.local_fs import RawLocal
+from ..data.storage.local_fs import LocalStorage
 
 class ZoneProcessor:
     """Process individual zones for ETL operations"""
     
-    def __init__(self, storage: RawLocal):
+    def __init__(self, storage: LocalStorage):
         self.storage = storage
     
     def extract_zone_data(self, zone_name: str, bbox: tuple, dt_from: str, dt_to: str, ingest_date: str) -> dict:
