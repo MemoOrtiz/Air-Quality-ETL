@@ -44,3 +44,24 @@ def out_dir():
             "Add: OUT_DIR=./raw_openaq (or your preferred directory path)"
         )
     return out_dir_value
+
+def s3_bucket():
+    """
+    Load S3 bucket name from .env
+    Returns None if not configured (allows using local storage)
+    """
+    return os.getenv("AWS_S3_BUCKET_NAME")
+
+def s3_prefix():
+    """
+    Load S3 prefix/folder from .env
+    Defaults to 'bronze' for medallion architecture
+    """
+    return os.getenv("AWS_S3_PREFIX", "bronze")
+
+def storage_mode():
+    """
+    Determine storage mode based on S3 configuration
+    Returns: 's3' if S3_BUCKET_NAME is configured, 'local' otherwise
+    """
+    return "s3" if s3_bucket() else "local"
