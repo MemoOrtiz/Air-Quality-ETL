@@ -3,8 +3,9 @@
 import os, json
 from datetime import datetime
 from ...utils.helpers import ensure_dir
+from .storage_interface import StorageInterface
 
-class RawLocal:
+class LocalStorage(StorageInterface):
     def __init__(self, base="./raw"):
         self.base = base
 
