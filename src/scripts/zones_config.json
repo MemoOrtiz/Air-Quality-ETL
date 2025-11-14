@@ -1,7 +1,7 @@
 {
   "zones": [
-    { "name": "Monterrey_ZMM", "bbox": [-100.60, 25.50, -99.95, 25.85] },
-    {"name": "Guadalajara_ZMG","bbox": [-103.50, 20.50, -103.20, 20.80]},
-    { "name": "CDMX_ZM", "bbox": [-99.35, 19.15, -98.95, 19.65] }
+    { "name": "Monterrey_Metropolitan", "bbox": [-100.60, 25.50, -99.95, 25.85] },
+    {"name": "Guadalajara_Metropolitan","bbox": [-103.50, 20.50, -103.20, 20.80]},
+    { "name": "CDMX_Metropolitan", "bbox": [-99.35, 19.15, -98.95, 19.65] }
   ]
 }
