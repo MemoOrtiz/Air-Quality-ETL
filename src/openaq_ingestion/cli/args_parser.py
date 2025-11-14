@@ -10,17 +10,43 @@ def parse_arguments():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Usage examples:
-  # Full extraction for all zones
-  python -m openaq_ingestion.main --from 2025-09-01T00:00:00Z --to 2025-10-15T23:59:59Z
 
-  # Only a specific zone
-  python -m openaq_ingestion.main --zone Monterrey_ZMM --from 2025-09-01T00:00:00Z --to 2025-10-15T23:59:59Z
+  --BASIC USAGE:
+  
+  # Extract 1 day of data for all zones (auto-detect storage)
+  python -m src.openaq_ingestion.main --from 2025-11-14T00:00:00Z --to 2025-11-14T23:59:59Z
+  
+  # Extract data for a specific zone
+  python -m src.openaq_ingestion.main --zone Monterrey_ZMM --from 2025-11-01T00:00:00Z --to 2025-11-15T23:59:59Z
+  
+  --STORAGE OPTIONS:
+  
+  # Force LOCAL storage (saves to directory)
+  python -m src.openaq_ingestion.main --storage local --zone Guadalajara_ZMG --from 2025-11-14T00:00:00Z --to 2025-11-14T23:59:59Z
+  
+  # Force S3 storage (requires AWS_S3_BUCKET_NAME in .env)
+  python -m src.openaq_ingestion.main --storage s3 --zone Monterrey_ZMM --from 2025-11-14T00:00:00Z --to 2025-11-14T23:59:59Z
+  
+  --ADVANCED OPTIONS:
+  
+  # Custom output directory (local storage only)
+  python -m src.openaq_ingestion.main --storage local --out ./my_data --from 2025-11-01T00:00:00Z --to 2025-11-15T23:59:59Z
+  
+  # Custom zones config file
+  python -m src.openaq_ingestion.main --zones ./custom_zones.json --from 2025-11-01T00:00:00Z --to 2025-11-15T23:59:59Z
+  
+  # Full month to S3
+  python -m src.openaq_ingestion.main --storage s3 --from 2025-10-01T00:00:00Z --to 2025-10-31T23:59:59Z
+  
+  --QUICK TESTS:
+  
+  # Test with 1 hour of data (fastest)
+  python -m src.openaq_ingestion.main --zone Monterrey_ZMM --from 2025-11-14T00:00:00Z --to 2025-11-14T01:00:00Z
+  
+  # Test S3 with minimal data
+  python -m src.openaq_ingestion.main --storage s3 --zone CDMX_ZM --from 2025-11-14T12:00:00Z --to 2025-11-14T13:00:00Z
 
-  # Specify output directory
-  python -m openaq_ingestion.main --from 2025-09-01T00:00:00Z --to 2025-10-15T23:59:59Z --out ./my_data
-
-  # Different zones configuration file
-  python -m openaq_ingestion.main --zones ./custom_zones.json --from 2025-09-01T00:00:00Z --to 2025-10-15T23:59:59Z
+Available zones: Monterrey_ZMM, CDMX_ZM, Guadalajara_ZMG
         """
     )
     
@@ -58,6 +84,13 @@ Usage examples:
         dest="out_base", 
         default=out_dir(),
         help=f"Base output directory (default: {out_dir()})"
+    )
+
+    parser.add_argument(
+        "--storage",
+        choices=["local", "s3"],
+        default=None,
+        help="Storage backend: 'local' for filesystem, 's3' for AWS S3. If not specified, auto-detects based on S3_BUCKET_NAME in .env"
     )
     
     return parser.parse_args()
