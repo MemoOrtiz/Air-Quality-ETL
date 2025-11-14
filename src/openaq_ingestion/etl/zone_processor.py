@@ -146,19 +146,21 @@ class ZoneProcessor:
                 )
                 
                 if pages_data:
-                    # Save pages in the pages/ directory
-                    self.storage.save_measurements_pages(zone_name, sensor_id, pages_data, ingest_date)
+                    # # Organize by event date and save in event_date/ directory
+                    # measurements_by_date = self._organize_by_event_date(pages_data)
+                    # self.storage.save_measurements_by_event_date(zone_name, sensor_id, measurements_by_date)
                     
-                    # NEW: Organize by event date and save in event_date/ directory
-                    measurements_by_date = self._organize_by_event_date(pages_data)
-                    self.storage.save_measurements_by_event_date(zone_name, sensor_id, measurements_by_date)
+                    # ========== OPTION 2: BRONZE ONLY (recommended for AWS/Cloud) ==========
+                    # Raw extraction only, no processing (faster)
+                    # Processing will be done in Silver layer separately
+                    self.storage.save_measurements_raw(zone_name, sensor_id, pages_data, ingest_date)
                     
                     # Count total measurements
                     measurements_count = sum(len(page.get("results", [])) for page in pages_data)
                     total_measurements += measurements_count
                     
                     print(f"    -> {measurements_count} measurements in {len(pages_data)} pages")
-                    print(f"       Organized by {len(measurements_by_date)} event dates")
+                    print(f"       Raw data saved to Bronze layer (no processing)")
                 else:
                     print(f"    -> No data in the specified range")
                     
