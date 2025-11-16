@@ -51,8 +51,8 @@ Available zones: Monterrey_ZMM, CDMX_ZM, Guadalajara_ZMG
     )
     
     # Calculate zones config path relative to this file
-    current_dir = Path(__file__).parent.parent.parent.parent  # Back to project root
-    default_zones_path = current_dir / "src" / "scripts" / "zones_config.json"
+    current_dir = Path(__file__).parent.parent  # Back to openaq directory
+    default_zones_path = current_dir / "scripts" / "zones_config.json"
     
     parser.add_argument(
         "--zones", 
