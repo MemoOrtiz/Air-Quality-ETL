@@ -1,4 +1,4 @@
-# src/openaq_ingestion/cli/args_parser.py
+# src/ingestion/openaq/cli/argument_parser.py
 import argparse
 from pathlib import Path
 from ..configs.settings import out_dir
@@ -14,39 +14,39 @@ Usage examples:
   --BASIC USAGE:
   
   # Extract 1 day of data for all zones (auto-detect storage)
-  python -m src.openaq_ingestion.main --from 2025-11-14T00:00:00Z --to 2025-11-14T23:59:59Z
+  python -m src.main --from 2025-11-14T00:00:00Z --to 2025-11-14T23:59:59Z
   
   # Extract data for a specific zone
-  python -m src.openaq_ingestion.main --zone Monterrey_ZMM --from 2025-11-01T00:00:00Z --to 2025-11-15T23:59:59Z
+  python -m src.main --zone Monterrey_Metropolitan --from 2025-11-01T00:00:00Z --to 2025-11-15T23:59:59Z
   
   --STORAGE OPTIONS:
   
   # Force LOCAL storage (saves to directory)
-  python -m src.openaq_ingestion.main --storage local --zone Guadalajara_ZMG --from 2025-11-14T00:00:00Z --to 2025-11-14T23:59:59Z
+  python -m src.main --storage local --zone Guadalajara_Metropolitan --from 2025-11-14T00:00:00Z --to 2025-11-14T23:59:59Z
   
   # Force S3 storage (requires AWS_S3_BUCKET_NAME in .env)
-  python -m src.openaq_ingestion.main --storage s3 --zone Monterrey_ZMM --from 2025-11-14T00:00:00Z --to 2025-11-14T23:59:59Z
+  python -m src.main --storage s3 --zone Monterrey_Metropolitan --from 2025-11-14T00:00:00Z --to 2025-11-14T23:59:59Z
   
   --ADVANCED OPTIONS:
   
   # Custom output directory (local storage only)
-  python -m src.openaq_ingestion.main --storage local --out ./my_data --from 2025-11-01T00:00:00Z --to 2025-11-15T23:59:59Z
+  python -m src.main --storage local --out ./my_data --from 2025-11-01T00:00:00Z --to 2025-11-15T23:59:59Z
   
   # Custom zones config file
-  python -m src.openaq_ingestion.main --zones ./custom_zones.json --from 2025-11-01T00:00:00Z --to 2025-11-15T23:59:59Z
+  python -m src.main --zones ./custom_zones.json --from 2025-11-01T00:00:00Z --to 2025-11-15T23:59:59Z
   
   # Full month to S3
-  python -m src.openaq_ingestion.main --storage s3 --from 2025-10-01T00:00:00Z --to 2025-10-31T23:59:59Z
+  python -m src.main --storage s3 --from 2025-10-01T00:00:00Z --to 2025-10-31T23:59:59Z
   
   --QUICK TESTS:
   
   # Test with 1 hour of data (fastest)
-  python -m src.openaq_ingestion.main --zone Monterrey_ZMM --from 2025-11-14T00:00:00Z --to 2025-11-14T01:00:00Z
+  python -m src.main --zone Monterrey_Metropolitan --from 2025-11-14T00:00:00Z --to 2025-11-14T01:00:00Z
   
   # Test S3 with minimal data
-  python -m src.openaq_ingestion.main --storage s3 --zone CDMX_ZM --from 2025-11-14T12:00:00Z --to 2025-11-14T13:00:00Z
+  python -m src.main --storage s3 --zone CDMX_Metropolitan --from 2025-11-14T12:00:00Z --to 2025-11-14T13:00:00Z
 
-Available zones: Monterrey_ZMM, CDMX_ZM, Guadalajara_ZMG
+Available zones: Monterrey_Metropolitan, CDMX_Metropolitan, Guadalajara_Metropolitan
         """
     )
     
@@ -62,7 +62,7 @@ Available zones: Monterrey_ZMM, CDMX_ZM, Guadalajara_ZMG
     
     parser.add_argument(
         "--zone", 
-        help="Process only this specific zone by name (e.g., 'Monterrey_ZMM')"
+        help="Process only this specific zone by name (e.g., 'Monterrey_Metropolitan')"
     )
     
     parser.add_argument(

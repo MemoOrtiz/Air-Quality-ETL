@@ -1,4 +1,4 @@
-# src/openaq_ingestion/data/fetchers.py
+# src/ingestion/openaq/fetchers/fetchers.py
 import os, json
 from .http_client import get
 from ..configs.settings import api_base, PAGE_LIMIT_DEFAULT
