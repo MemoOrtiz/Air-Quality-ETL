@@ -32,7 +32,7 @@ A production-ready Extract, Transform, and Load (ETL) system for air quality dat
 
 - **Multi-Storage Backend**: Pluggable storage architecture supporting Local FileSystem and AWS S3
 - **Interface-Driven Design**: Clean abstraction layer enabling easy addition of new storage backends (Azure Blob, GCS, etc.)
-- **Medallion Architecture**: Bronze layer implementation for raw data lake ingestion
+- **Medallion Architecture**: Bronze layer implementation for immutable data lake ingestion
 - **Environment-Based Configuration**: Flexible `.env` configuration with automatic storage detection
 - **Rate Limiting**: Intelligent OpenAQ API rate limiting (60/min, 2000/hour)
 - **Geographic Zones**: Configurable bounding box filtering for multiple metropolitan areas
@@ -53,7 +53,7 @@ A production-ready Extract, Transform, and Load (ETL) system for air quality dat
                              │                     │                     │
                              ▼                     ▼                     ▼
                       ┌─────────────┐      ┌─────────────┐      ┌─────────────┐
-                      │zones_config │      │   Fetchers  │      │  Raw Data   │
+                      │zones_config │      │   Fetchers  │      │ Bronze Data │
                       │    .json    │      │  (API Calls)│      │   (Bronze)  │
                       └─────────────┘      └─────────────┘      └─────────────┘
 ```
@@ -95,7 +95,7 @@ data-project/
 │   │           └── helpers.py
 │   ├── transformation/
 │   └── aggregation/
-├── raw/                                  # Local data output (Bronze layer)
+├── bronze/                                  # Local data output (Bronze layer)
 ├── tests/
 ├── .env
 ├── .gitignore
@@ -367,7 +367,7 @@ class ZoneProcessor:
 
 ## Data Organization (Medallion Architecture)
 
-### **Bronze Layer (Raw Data)**
+### **Bronze Layer (Immutable Source Data)**
 
 The system organizes data following the **Medallion Architecture** pattern:
 
