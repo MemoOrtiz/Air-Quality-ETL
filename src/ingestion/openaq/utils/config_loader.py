@@ -1,4 +1,4 @@
-# src/openaq_ingestion/utils/config_loader.py
+# src/ingestion/openaq/utils/config_loader.py
 import json
 import sys
 

@@ -67,38 +67,41 @@ A production-ready Extract, Transform, and Load (ETL) system for air quality dat
 
 ---
 
-## Project Structure Explained
+## Project Structure
 
 ```
-src/openaq_ingestion/
-├── main.py                    # Entry point - Initializes orchestrator
-├── cli/
-│   └── args_parser.py         # CLI argument parsing and validation
-├── core/
-│   ├── config.py              # Environment configuration loader
-│   └── api.py                 # OpenAQ API client with rate limiting
-├── data/
-│   ├── fetchers.py            # API data extraction functions
-│   └── storage/
-│       ├── storage_interface.py   # Abstract base class for storage
-│       ├── local_fs.py            # Local filesystem implementation
-│       └── s3_storage.py          # AWS S3 implementation
-├── etl/
-│   ├── orchestrator.py        # Main ETL coordinator
-│   └── zone_processor.py      # Zone-specific processing logic
-└── utils/
-    ├── config_loader.py       # Loads zones_config.json
-    ├── helpers.py             # Utility functions
-    └── printer.py             # Output formatting
+data-project/
+├── src/
+│   ├── main.py                           # Entry point
+│   ├── ingestion/
+│   │   └── openaq/
+│   │       ├── cli/
+│   │       │   └── argument_parser.py
+│   │       ├── configs/
+│   │       │   ├── settings.py
+│   │       │   └── zones_config.json
+│   │       ├── fetchers/
+│   │       │   ├── http_client.py
+│   │       │   └── fetchers.py
+│   │       ├── storage/
+│   │       │   ├── storage_interface.py
+│   │       │   ├── local_filesystem.py
+│   │       │   └── s3_storage.py
+│   │       ├── pipeline/
+│   │       │   ├── orchestrator.py
+│   │       │   └── zone_processor.py
+│   │       └── utils/
+│   │           ├── config_loader.py
+│   │           └── helpers.py
+│   ├── transformation/
+│   └── aggregation/
+├── raw/                                  # Local data output (Bronze layer)
+├── tests/
+├── .env
+├── .gitignore
+├── requirements.txt
+└── README.md
 ```
-
-**Key Components Explained:**
-
-- **` config.py`**: Loads `.env` variables and determines storage mode
-- **` storage_interface.py`**: Defines contract that all storage implementations must follow
-- **` orchestrator.py`**: Coordinates entire ETL flow and initializes correct storage backend
-- **` zone_processor.py`**: Processes individual zones using storage interface
-- **` config_loader.py`**: Parses `zones_config.json` to get geographic boundaries
 
 ---
 
@@ -147,9 +150,9 @@ AWS_SECRET_ACCESS_KEY=xxxxx
 AWS_DEFAULT_REGION=us-east-1
 ```
 
-**Loaded by:** `core/config.py` using `python-dotenv`
+**Loaded by:** `configs/settings.py` using `python-dotenv`
 
-#### **Step 3: Config Module (`core/config.py`)**
+#### **Step 3: Config Module (`configs/settings.py`)**
 
 Exposes configuration through functions:
 
@@ -165,13 +168,13 @@ def out_dir():
     return os.getenv("OUT_DIR")
 ```
 
-**Used by:** `orchestrator.py` to initialize storage
+**Used by:** `pipeline/orchestrator.py` to initialize storage
 
 ---
 
 ### **2. Storage Interface Pattern**
 
-#### **The Abstract Interface** (`data/storage/storage_interface.py`)
+#### **The Abstract Interface** (`storage/storage_interface.py`)
 
 Defines the contract that ALL storage backends must implement:
 
@@ -197,7 +200,7 @@ class StorageInterface(ABC):
 -  **Extensibility**: Adding Azure Blob Storage = creating new class implementing interface
 -  **Testability**: Easy to mock storage for unit tests
 
-#### **Local Implementation** (`data/storage/local_fs.py`)
+#### **Local Implementation** (`storage/local_filesystem.py`)
 
 ```python
 class LocalStorage(StorageInterface):
@@ -216,7 +219,7 @@ class LocalStorage(StorageInterface):
             self.save_json(file_path, page_data)
 ```
 
-#### **S3 Implementation** (`data/storage/s3_storage.py`)
+#### **S3 Implementation** (`storage/s3_storage.py`)
 
 ```python
 class S3Storage(StorageInterface):
@@ -248,7 +251,7 @@ class S3Storage(StorageInterface):
 
 ---
 
-### **3. Orchestrator: The Central Coordinator** (`etl/orchestrator.py`)
+### **3. Orchestrator: The Central Coordinator** (`pipeline/orchestrator.py`)
 
 The orchestrator ties everything together:
 
@@ -285,7 +288,7 @@ class DataIngestionOrchestrator:
 
 ---
 
-### **4. Zone Processor: Storage-Agnostic Worker** (`etl/zone_processor.py`)
+### **4. Zone Processor: Storage-Agnostic Worker** (`pipeline/zone_processor.py`)
 
 Processes individual geographic zones without knowing storage details:
 
@@ -325,7 +328,7 @@ class ZoneProcessor:
 ## Execution Flow (Step-by-Step)
 
 ```
-1. User runs: python -m src.openaq_ingestion.main --storage s3 --from ... --to ...
+1. User runs: python -m src.main --storage s3 --from ... --to ...
                                     ↓
 2. main.py → load_env() → loads .env variables
                                     ↓
@@ -335,7 +338,7 @@ class ZoneProcessor:
                                     ↓
 5. orchestrator._initialize_storage():
    - Reads: storage_type="s3" (from CLI)
-   - Reads: AWS_S3_BUCKET_NAME from .env (via config.py)
+   - Reads: AWS_S3_BUCKET_NAME from .env (via configs/settings.py)
    - Creates: S3Storage(bucket="datalake-openaq", prefix="bronze")
    - Returns: storage instance
                                     ↓
@@ -386,10 +389,10 @@ bronze/
             └── sensors_loc-{location_id}.json
 ```
 
-**Example (Guadalajara_ZMG zone):**
+**Example (Guadalajara_Metropolitan zone):**
 ```
 bronze/
-└── zone=Guadalajara_ZMG/
+└── zone=Guadalajara_Metropolitan/
     ├── measurements/
     │   └── pages/
     │       └── ingest_date=2025-11-14/
@@ -418,7 +421,7 @@ s3://{bucket_name}/{prefix}/
 ```
 
 **Partitioning Strategy:**
-- `zone=`: Geographic area (Monterrey_ZMM, Guadalajara_ZMG, CDMX_ZM)
+- `zone=`: Geographic area (Monterrey_Metropolitan, Guadalajara_Metropolitan, CDMX_Metropolitan)
 - `ingest_date=`: When data was ingested (enables incremental processing)
 - `sensor_id=`: Individual sensor identifier
 
@@ -616,8 +619,8 @@ The following examples show the actual content structure of the JSON files store
 
 ```bash
 # System auto-detects S3 if AWS_S3_BUCKET_NAME is in .env
-python -m src.openaq_ingestion.main \
-  --zone Monterrey_ZMM \
+python -m src.main \
+  --zone Monterrey_Metropolitan \
   --from 2025-09-01T00:00:00Z \
   --to 2025-10-15T23:59:59Z
 ```
@@ -626,16 +629,16 @@ python -m src.openaq_ingestion.main \
 
 ```bash
 # Force local storage (even if S3 configured)
-python -m src.openaq_ingestion.main \
+python -m src.main \
   --storage local \
-  --zone Guadalajara_ZMG \
+  --zone Guadalajara_Metropolitan \
   --from 2025-10-01T00:00:00Z \
   --to 2025-10-31T23:59:59Z
 
 # Force S3 storage
-python -m src.openaq_ingestion.main \
+python -m src.main \
   --storage s3 \
-  --zone CDMX_ZM \
+  --zone CDMX_Metropolitan \
   --from 2025-11-01T00:00:00Z \
   --to 2025-11-30T23:59:59Z
 ```
@@ -644,7 +647,7 @@ python -m src.openaq_ingestion.main \
 
 ```bash
 # Extract all zones defined in zones_config.json
-python -m src.openaq_ingestion.main \
+python -m src.main \
   --from 2025-09-01T00:00:00Z \
   --to 2025-10-15T23:59:59Z
 ```
@@ -653,7 +656,7 @@ python -m src.openaq_ingestion.main \
 
 ```bash
 # Use custom zones configuration file
-python -m src.openaq_ingestion.main \
+python -m src.main \
   --zones ./custom_zones.json \
   --from 2025-09-01T00:00:00Z \
   --to 2025-10-15T23:59:59Z
@@ -664,10 +667,10 @@ python -m src.openaq_ingestion.main \
 | Option | Description | Required | Default |
 |--------|-------------|----------|---------|
 | `--storage` | Storage backend: `local` or `s3` | No | Auto-detect from `.env` |
-| `--zone` | Specific zone name (e.g., 'Monterrey_ZMM') | No | All zones |
+| `--zone` | Specific zone name (e.g., 'Monterrey_Metropolitan') | No | All zones |
 | `--from` | Start date/time in ISO format | Yes | - |
 | `--to` | End date/time in ISO format | Yes | - |
-| `--zones` | Path to zones configuration file | No | `src/scripts/zones_config.json` |
+| `--zones` | Path to zones configuration file | No | `src/ingestion/openaq/configs/zones_config.json` |
 | `--out` | Base output directory (local storage) | No | `./bronze` |
 
 ---
@@ -682,15 +685,15 @@ Defines geographic areas to extract data from using bounding boxes:
 {
   "zones": [
     {
-      "name": "Monterrey_ZMM",
+      "name": "Monterrey_Metropolitan",
       "bbox": [-100.6, 25.5, -99.95, 25.85]
     },
     {
-      "name": "Guadalajara_ZMG",
+      "name": "Guadalajara_Metropolitan",
       "bbox": [-103.5, 20.5, -103.2, 20.8]
     },
     {
-      "name": "CDMX_ZM",
+      "name": "CDMX_Metropolitan",
       "bbox": [-99.35, 19.25, -98.95, 19.55]
     }
   ]
@@ -733,7 +736,7 @@ source .venv/bin/activate
 python -c "from dotenv import load_dotenv; import os; load_dotenv(); print('S3 Bucket:', os.getenv('AWS_S3_BUCKET_NAME'))"
 
 # Test 2: Storage mode detection
-python -c "from src.openaq_ingestion.core.config import storage_mode; print('Storage mode:', storage_mode())"
+python -c "from src.ingestion.openaq.configs.settings import storage_mode; print('Storage mode:', storage_mode())"
 
 # Test 3: AWS connectivity (S3 only)
 python -c "import boto3; s3=boto3.client('s3'); print('S3 buckets:', [b['Name'] for b in s3.list_buckets()['Buckets']])"
@@ -745,9 +748,9 @@ Test with a small date range first:
 
 ```bash
 # Test single day
-python -m src.openaq_ingestion.main \
+python -m src.main \
   --storage local \
-  --zone Monterrey_ZMM \
+  --zone Monterrey_Metropolitan \
   --from 2025-10-01T00:00:00Z \
   --to 2025-10-01T23:59:59Z
 ```
