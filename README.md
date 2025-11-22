@@ -76,7 +76,8 @@ data-project/
 │   ├── ingestion/
 │   │   └── openaq/
 │   │       ├── cli/
-│   │       │   └── argument_parser.py
+│   │       │   ├── argument_parser.py
+│   │       │   └── output_formatter.py
 │   │       ├── configs/
 │   │       │   ├── settings.py
 │   │       │   └── zones_config.json
@@ -195,7 +196,7 @@ class StorageInterface(ABC):
         """Save raw measurements data (Bronze layer)"""
         pass
     
-    # Additional methods: save_locations_index, save_sensors_for_location, etc.
+    # Additional methods: save_locations_index, save_sensors_by_location, etc.
 ```
 
 **Why this matters:**
@@ -207,16 +208,16 @@ class StorageInterface(ABC):
 
 ```python
 class LocalStorage(StorageInterface):
-    def __init__(self, base="./raw"):
+    def __init__(self, base="./bronze"):
         self.base = base
 
     def save_json(self, path: str, data: dict):
         ensure_dir(os.path.dirname(path))
-        with open(path, "w") as f:
+        with open(path, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False)
 
     def save_measurements_raw(self, zone, sensor_id, pages_data, ingest_date):
-        folder = self.measurements_pages_dir(zone, sensor_id, ingest_date)
+        folder = self.measurements_dir(zone, sensor_id, ingest_date)
         for page_num, page_data in enumerate(pages_data, 1):
             file_path = os.path.join(folder, f"page-{page_num}.json")
             self.save_json(file_path, page_data)
@@ -241,7 +242,7 @@ class S3Storage(StorageInterface):
         )
 
     def save_measurements_raw(self, zone, sensor_id, pages_data, ingest_date):
-        folder = self.measurements_pages_dir(zone, sensor_id, ingest_date)
+        folder = self.measurements_dir(zone, sensor_id, ingest_date)
         for page_num, page_data in enumerate(pages_data, 1):
             path = f"{folder}/page-{page_num}.json"
             self.save_json(path, page_data)
@@ -308,10 +309,10 @@ class ZoneProcessor:
         self.storage.save_locations_index(zone_name, locations, ingest_date)
         
         # 3. Fetch sensors
-        sensors = fetch_sensors_for_location(loc_id)
+        sensors = fetch_sensors_by_location(loc_id)
         
         # 4. Save sensors
-        self.storage.save_sensors_for_location(zone_name, loc_id, sensors, ingest_date)
+        self.storage.save_sensors_by_location(zone_name, loc_id, sensors, ingest_date)
         
         # 5. Fetch measurements
         pages_data = fetch_measurements_for_sensor_raw(sensor_id, dt_from, dt_to)
@@ -355,8 +356,8 @@ class ZoneProcessor:
    - Calls: fetch_locations_bbox() → API request
    - Calls: self.storage.save_locations_index() → S3Storage.save_json()
       → boto3.put_object() → uploads to s3://datalake-openaq/bronze/zone=X/metadata/...
-   - Calls: fetch_sensors_for_location() → API request
-   - Calls: self.storage.save_sensors_for_location() → S3Storage.save_json()
+   - Calls: fetch_sensors_by_location() → API request
+   - Calls: self.storage.save_sensors_by_location() → S3Storage.save_json()
    - Calls: fetch_measurements_for_sensor_raw() → API requests (paginated)
    - Calls: self.storage.save_measurements_raw() → S3Storage.save_json()
       → Multiple files uploaded to S3
@@ -379,54 +380,32 @@ The system organizes data following the **Medallion Architecture** pattern:
 bronze/
 └── zone={zone_name}/
     ├── measurements/
-    │   └── pages/
-    │       └── ingest_date={YYYY-MM-DD}/
-    │           └── sensor_id={id}/
-    │               ├── page-1.json
-    │               ├── page-2.json
-    │               └── page-N.json
+    │   └── ingest_date={YYYY-MM-DD}/
+    │       └── sensor_id={sensor_id}/
+    │           ├── page-1.json
+    │           ├── page-2.json
+    │           └── page-N.json
     └── metadata/
         └── ingest_date={YYYY-MM-DD}/
             ├── locations_index.json
             ├── sensors_index.json
-            └── sensors_loc-{location_id}.json
-```
-
-**Example (Guadalajara_Metropolitan zone):**
-```
-bronze/
-└── zone=Guadalajara_Metropolitan/
-    ├── measurements/
-    │   └── pages/
-    │       └── ingest_date=2025-11-14/
-    │           ├── sensor_id=22803/
-    │           │   └── page-1.json
-    │           ├── sensor_id=22932/
-    │           │   ├── page-1.json
-    │           │   └── page-2.json
-    │           └── sensor_id=23112/
-    │               └── page-1.json
-    └── metadata/
-        └── ingest_date=2025-11-14/
-            ├── locations_index.json
-            ├── sensors_index.json
-            ├── sensors_loc-10536.json
-            ├── sensors_loc-10549.json
-            └── sensors_loc-7719.json
+            └── sensors_by_location/
+                └── location_id={location_id}.json
 ```
 
 **S3 Storage Structure:**
 ```
 s3://{bucket_name}/{prefix}/
 └── zone={zone_name}/
-    ├── measurements/pages/ingest_date={YYYY-MM-DD}/sensor_id={id}/page-N.json
-    └── metadata/ingest_date={YYYY-MM-DD}/{filename}.json
+    ├── measurements/ingest_date={YYYY-MM-DD}/sensor_id={sensor_id}/page-N.json
+    └── metadata/ingest_date={YYYY-MM-DD}/sensors_by_location/location_id={location_id}.json
 ```
 
 **Partitioning Strategy:**
-- `zone=`: Geographic area (Monterrey_Metropolitan, Guadalajara_Metropolitan, CDMX_Metropolitan)
+- `zone=`: Geographic area
 - `ingest_date=`: When data was ingested (enables incremental processing)
 - `sensor_id=`: Individual sensor identifier
+- `location_id=`: Monitoring station identifier
 
 **Why Bronze Layer?**
 - **Raw, immutable**: Exact API responses preserved
@@ -461,14 +440,14 @@ bronze/zone=Guadalajara_Metropolitan/
 ├── measurements/ingest_date=2025-11-22/
 │   ├── sensor_id=22933/page-1.json
 │   ├── sensor_id=23291/page-1.json
-│   └── ... (77 sensors total)
+│   └── ... 
 └── metadata/ingest_date=2025-11-22/
     ├── locations_index.json          # 23 locations
     ├── sensors_index.json             # 147 sensors (all)
     └── sensors_by_location/
         ├── location_id=7719.json
         ├── location_id=7855.json
-        └── ... (23 files total)
+        └── ... 
 ```
 
 **Use Cases:**
@@ -483,112 +462,71 @@ bronze/zone=Guadalajara_Metropolitan/
 
 The following examples show the actual content structure of the JSON files stored in the Bronze layer:
 
-**Locations Index (`metadata/ingest_date=2025-11-14/locations_index.json`):**
+**Locations Index (`metadata/ingest_date={YYYY-MM-DD}/locations_index.json`):**
 ```json
 {
   "locations": [
     {
-      "id": 10666,
-      "name": "Obispado",
+      "id": {location_id},
+      "name": "{location_name}",
       "coordinates": {
-        "latitude": 25.6864,
-        "longitude": -100.3364
-      }
-    },
-    {
-      "id": 10710,
-      "name": "Santa Catarina",
-      "coordinates": {
-        "latitude": 25.6742,
-        "longitude": -100.4589
+        "latitude": {latitude},
+        "longitude": {longitude}
       }
     }
   ]
 }
 ```
 
-**Sensors for Location (`metadata/ingest_date=2025-11-14/sensors_by_location/location_id=10666.json`):**
+**Sensors for Location (`metadata/ingest_date={YYYY-MM-DD}/sensors_by_location/location_id={location_id}.json`):**
 ```json
 {
-  "location_id": 10666,
+  "location_id": {location_id},
   "sensors": [
     {
-      "id": 22803,
-      "name": "PM2.5",
+      "id": {sensor_id},
+      "name": "{parameter_name}",
       "parameter": {
-        "id": 2,
-        "name": "pm25",
-        "units": "µg/m³"
-      }
-    },
-    {
-      "id": 22804,
-      "name": "PM10",
-      "parameter": {
-        "id": 1,
-        "name": "pm10",
-        "units": "µg/m³"
+        "id": {parameter_id},
+        "name": "{parameter}",
+        "units": "{units}"
       }
     }
   ]
 }
 ```
 
-**Measurements Page (`measurements/pages/ingest_date=2025-11-14/sensor_id=22803/page-1.json`):**
+**Measurements Page (`measurements/ingest_date={YYYY-MM-DD}/sensor_id={sensor_id}/page-N.json`):**
 ```json
 {
   "meta": {
-    "found": 350,
+    "found": {total_records},
     "limit": 1000,
-    "page": 1
+    "page": {page_number}
   },
   "results": [
     {
       "period": {
-        "label": "2025-10-01 00:00:00+00 - 2025-10-01 01:00:00+00",
+        "label": "{datetime_from} - {datetime_to}",
         "datetimeFrom": {
-          "utc": "2025-10-01T00:00:00Z",
-          "local": "2025-09-30T18:00:00-06:00"
+          "utc": "{utc_datetime}",
+          "local": "{local_datetime}"
         },
         "datetimeTo": {
-          "utc": "2025-10-01T01:00:00Z",
-          "local": "2025-09-30T19:00:00-06:00"
+          "utc": "{utc_datetime}",
+          "local": "{local_datetime}"
         }
       },
-      "value": 42.5,
+      "value": {measurement_value},
       "parameter": {
-        "id": 2,
-        "name": "pm25",
-        "units": "µg/m³",
-        "displayName": "PM2.5"
+        "id": {parameter_id},
+        "name": "{parameter}",
+        "units": "{units}",
+        "displayName": "{display_name}"
       },
       "coordinates": {
-        "latitude": 25.6864,
-        "longitude": -100.3364
-      }
-    },
-    {
-      "period": {
-        "label": "2025-10-01 01:00:00+00 - 2025-10-01 02:00:00+00",
-        "datetimeFrom": {
-          "utc": "2025-10-01T01:00:00Z",
-          "local": "2025-09-30T19:00:00-06:00"
-        },
-        "datetimeTo": {
-          "utc": "2025-10-01T02:00:00Z",
-          "local": "2025-09-30T20:00:00-06:00"
-        }
-      },
-      "value": 38.2,
-      "parameter": {
-        "id": 2,
-        "name": "pm25",
-        "units": "µg/m³",
-        "displayName": "PM2.5"
-      },
-      "coordinates": {
-        "latitude": 25.6864,
-        "longitude": -100.3364
+        "latitude": {latitude},
+        "longitude": {longitude}
       }
     }
   ]
@@ -740,7 +678,7 @@ Defines geographic areas to extract data from using bounding boxes:
     },
     {
       "name": "CDMX_Metropolitan",
-      "bbox": [-99.35, 19.25, -98.95, 19.55]
+      "bbox": [-99.35, 19.15, -98.95, 19.65]
     }
   ]
 }
