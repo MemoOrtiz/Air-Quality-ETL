@@ -32,7 +32,7 @@ A production-ready Extract, Transform, and Load (ETL) system for air quality dat
 
 - **Multi-Storage Backend**: Pluggable storage architecture supporting Local FileSystem and AWS S3
 - **Interface-Driven Design**: Clean abstraction layer enabling easy addition of new storage backends (Azure Blob, GCS, etc.)
-- **Medallion Architecture**: Bronze layer implementation for raw data lake ingestion
+- **Medallion Architecture**: Bronze layer implementation for immutable data lake ingestion
 - **Environment-Based Configuration**: Flexible `.env` configuration with automatic storage detection
 - **Rate Limiting**: Intelligent OpenAQ API rate limiting (60/min, 2000/hour)
 - **Geographic Zones**: Configurable bounding box filtering for multiple metropolitan areas
@@ -53,7 +53,7 @@ A production-ready Extract, Transform, and Load (ETL) system for air quality dat
                              │                     │                     │
                              ▼                     ▼                     ▼
                       ┌─────────────┐      ┌─────────────┐      ┌─────────────┐
-                      │zones_config │      │   Fetchers  │      │  Raw Data   │
+                      │zones_config │      │   Fetchers  │      │ Bronze Data │
                       │    .json    │      │  (API Calls)│      │   (Bronze)  │
                       └─────────────┘      └─────────────┘      └─────────────┘
 ```
@@ -67,38 +67,45 @@ A production-ready Extract, Transform, and Load (ETL) system for air quality dat
 
 ---
 
-## Project Structure Explained
+## Project Structure
 
 ```
-src/openaq_ingestion/
-├── main.py                    # Entry point - Initializes orchestrator
-├── cli/
-│   └── args_parser.py         # CLI argument parsing and validation
-├── core/
-│   ├── config.py              # Environment configuration loader
-│   └── api.py                 # OpenAQ API client with rate limiting
-├── data/
-│   ├── fetchers.py            # API data extraction functions
-│   └── storage/
-│       ├── storage_interface.py   # Abstract base class for storage
-│       ├── local_fs.py            # Local filesystem implementation
-│       └── s3_storage.py          # AWS S3 implementation
-├── etl/
-│   ├── orchestrator.py        # Main ETL coordinator
-│   └── zone_processor.py      # Zone-specific processing logic
-└── utils/
-    ├── config_loader.py       # Loads zones_config.json
-    ├── helpers.py             # Utility functions
-    └── printer.py             # Output formatting
+data-project/
+├── src/
+│   ├── main.py                           # Entry point
+│   ├── ingestion/
+│   │   └── openaq/
+│   │       ├── cli/
+│   │       │   ├── argument_parser.py
+│   │       │   └── output_formatter.py
+│   │       ├── configs/
+│   │       │   ├── settings.py
+│   │       │   └── zones_config.json
+│   │       ├── fetchers/
+│   │       │   ├── http_client.py
+│   │       │   └── fetchers.py
+│   │       ├── storage/
+│   │       │   ├── storage_interface.py
+│   │       │   ├── local_filesystem.py
+│   │       │   └── s3_storage.py
+│   │       ├── pipeline/
+│   │       │   ├── orchestrator.py
+│   │       │   └── zone_processor.py
+│   │       └── utils/
+│   │           ├── config_loader.py
+│   │           └── helpers.py
+│   ├── transformation/
+│   └── aggregation/
+├── bronze/                                  # Local data output (Bronze layer)
+│   └── zone=Guadalajara_Metropolitan/      # Sample data for validation
+│       ├── measurements/
+│       └── metadata/
+├── tests/
+├── .env
+├── .gitignore
+├── requirements.txt
+└── README.md
 ```
-
-**Key Components Explained:**
-
-- **` config.py`**: Loads `.env` variables and determines storage mode
-- **` storage_interface.py`**: Defines contract that all storage implementations must follow
-- **` orchestrator.py`**: Coordinates entire ETL flow and initializes correct storage backend
-- **` zone_processor.py`**: Processes individual zones using storage interface
-- **` config_loader.py`**: Parses `zones_config.json` to get geographic boundaries
 
 ---
 
@@ -147,9 +154,9 @@ AWS_SECRET_ACCESS_KEY=xxxxx
 AWS_DEFAULT_REGION=us-east-1
 ```
 
-**Loaded by:** `core/config.py` using `python-dotenv`
+**Loaded by:** `configs/settings.py` using `python-dotenv`
 
-#### **Step 3: Config Module (`core/config.py`)**
+#### **Step 3: Config Module (`configs/settings.py`)**
 
 Exposes configuration through functions:
 
@@ -165,13 +172,13 @@ def out_dir():
     return os.getenv("OUT_DIR")
 ```
 
-**Used by:** `orchestrator.py` to initialize storage
+**Used by:** `pipeline/orchestrator.py` to initialize storage
 
 ---
 
 ### **2. Storage Interface Pattern**
 
-#### **The Abstract Interface** (`data/storage/storage_interface.py`)
+#### **The Abstract Interface** (`storage/storage_interface.py`)
 
 Defines the contract that ALL storage backends must implement:
 
@@ -189,7 +196,7 @@ class StorageInterface(ABC):
         """Save raw measurements data (Bronze layer)"""
         pass
     
-    # Additional methods: save_locations_index, save_sensors_for_location, etc.
+    # Additional methods: save_locations_index, save_sensors_by_location, etc.
 ```
 
 **Why this matters:**
@@ -197,26 +204,26 @@ class StorageInterface(ABC):
 -  **Extensibility**: Adding Azure Blob Storage = creating new class implementing interface
 -  **Testability**: Easy to mock storage for unit tests
 
-#### **Local Implementation** (`data/storage/local_fs.py`)
+#### **Local Implementation** (`storage/local_filesystem.py`)
 
 ```python
 class LocalStorage(StorageInterface):
-    def __init__(self, base="./raw"):
+    def __init__(self, base="./bronze"):
         self.base = base
 
     def save_json(self, path: str, data: dict):
         ensure_dir(os.path.dirname(path))
-        with open(path, "w") as f:
+        with open(path, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False)
 
     def save_measurements_raw(self, zone, sensor_id, pages_data, ingest_date):
-        folder = self.measurements_pages_dir(zone, sensor_id, ingest_date)
+        folder = self.measurements_dir(zone, sensor_id, ingest_date)
         for page_num, page_data in enumerate(pages_data, 1):
             file_path = os.path.join(folder, f"page-{page_num}.json")
             self.save_json(file_path, page_data)
 ```
 
-#### **S3 Implementation** (`data/storage/s3_storage.py`)
+#### **S3 Implementation** (`storage/s3_storage.py`)
 
 ```python
 class S3Storage(StorageInterface):
@@ -235,7 +242,7 @@ class S3Storage(StorageInterface):
         )
 
     def save_measurements_raw(self, zone, sensor_id, pages_data, ingest_date):
-        folder = self.measurements_pages_dir(zone, sensor_id, ingest_date)
+        folder = self.measurements_dir(zone, sensor_id, ingest_date)
         for page_num, page_data in enumerate(pages_data, 1):
             path = f"{folder}/page-{page_num}.json"
             self.save_json(path, page_data)
@@ -248,7 +255,7 @@ class S3Storage(StorageInterface):
 
 ---
 
-### **3. Orchestrator: The Central Coordinator** (`etl/orchestrator.py`)
+### **3. Orchestrator: The Central Coordinator** (`pipeline/orchestrator.py`)
 
 The orchestrator ties everything together:
 
@@ -285,7 +292,7 @@ class DataIngestionOrchestrator:
 
 ---
 
-### **4. Zone Processor: Storage-Agnostic Worker** (`etl/zone_processor.py`)
+### **4. Zone Processor: Storage-Agnostic Worker** (`pipeline/zone_processor.py`)
 
 Processes individual geographic zones without knowing storage details:
 
@@ -302,10 +309,10 @@ class ZoneProcessor:
         self.storage.save_locations_index(zone_name, locations, ingest_date)
         
         # 3. Fetch sensors
-        sensors = fetch_sensors_for_location(loc_id)
+        sensors = fetch_sensors_by_location(loc_id)
         
         # 4. Save sensors
-        self.storage.save_sensors_for_location(zone_name, loc_id, sensors, ingest_date)
+        self.storage.save_sensors_by_location(zone_name, loc_id, sensors, ingest_date)
         
         # 5. Fetch measurements
         pages_data = fetch_measurements_for_sensor_raw(sensor_id, dt_from, dt_to)
@@ -325,7 +332,7 @@ class ZoneProcessor:
 ## Execution Flow (Step-by-Step)
 
 ```
-1. User runs: python -m src.openaq_ingestion.main --storage s3 --from ... --to ...
+1. User runs: python -m src.main --storage s3 --from ... --to ...
                                     ↓
 2. main.py → load_env() → loads .env variables
                                     ↓
@@ -335,7 +342,7 @@ class ZoneProcessor:
                                     ↓
 5. orchestrator._initialize_storage():
    - Reads: storage_type="s3" (from CLI)
-   - Reads: AWS_S3_BUCKET_NAME from .env (via config.py)
+   - Reads: AWS_S3_BUCKET_NAME from .env (via configs/settings.py)
    - Creates: S3Storage(bucket="datalake-openaq", prefix="bronze")
    - Returns: storage instance
                                     ↓
@@ -349,8 +356,8 @@ class ZoneProcessor:
    - Calls: fetch_locations_bbox() → API request
    - Calls: self.storage.save_locations_index() → S3Storage.save_json()
       → boto3.put_object() → uploads to s3://datalake-openaq/bronze/zone=X/metadata/...
-   - Calls: fetch_sensors_for_location() → API request
-   - Calls: self.storage.save_sensors_for_location() → S3Storage.save_json()
+   - Calls: fetch_sensors_by_location() → API request
+   - Calls: self.storage.save_sensors_by_location() → S3Storage.save_json()
    - Calls: fetch_measurements_for_sensor_raw() → API requests (paginated)
    - Calls: self.storage.save_measurements_raw() → S3Storage.save_json()
       → Multiple files uploaded to S3
@@ -364,7 +371,7 @@ class ZoneProcessor:
 
 ## Data Organization (Medallion Architecture)
 
-### **Bronze Layer (Raw Data)**
+### **Bronze Layer (Immutable Source Data)**
 
 The system organizes data following the **Medallion Architecture** pattern:
 
@@ -373,54 +380,32 @@ The system organizes data following the **Medallion Architecture** pattern:
 bronze/
 └── zone={zone_name}/
     ├── measurements/
-    │   └── pages/
-    │       └── ingest_date={YYYY-MM-DD}/
-    │           └── sensor_id={id}/
-    │               ├── page-1.json
-    │               ├── page-2.json
-    │               └── page-N.json
+    │   └── ingest_date={YYYY-MM-DD}/
+    │       └── sensor_id={sensor_id}/
+    │           ├── page-1.json
+    │           ├── page-2.json
+    │           └── page-N.json
     └── metadata/
         └── ingest_date={YYYY-MM-DD}/
             ├── locations_index.json
             ├── sensors_index.json
-            └── sensors_loc-{location_id}.json
-```
-
-**Example (Guadalajara_ZMG zone):**
-```
-bronze/
-└── zone=Guadalajara_ZMG/
-    ├── measurements/
-    │   └── pages/
-    │       └── ingest_date=2025-11-14/
-    │           ├── sensor_id=22803/
-    │           │   └── page-1.json
-    │           ├── sensor_id=22932/
-    │           │   ├── page-1.json
-    │           │   └── page-2.json
-    │           └── sensor_id=23112/
-    │               └── page-1.json
-    └── metadata/
-        └── ingest_date=2025-11-14/
-            ├── locations_index.json
-            ├── sensors_index.json
-            ├── sensors_loc-10536.json
-            ├── sensors_loc-10549.json
-            └── sensors_loc-7719.json
+            └── sensors_by_location/
+                └── location_id={location_id}.json
 ```
 
 **S3 Storage Structure:**
 ```
 s3://{bucket_name}/{prefix}/
 └── zone={zone_name}/
-    ├── measurements/pages/ingest_date={YYYY-MM-DD}/sensor_id={id}/page-N.json
-    └── metadata/ingest_date={YYYY-MM-DD}/{filename}.json
+    ├── measurements/ingest_date={YYYY-MM-DD}/sensor_id={sensor_id}/page-N.json
+    └── metadata/ingest_date={YYYY-MM-DD}/sensors_by_location/location_id={location_id}.json
 ```
 
 **Partitioning Strategy:**
-- `zone=`: Geographic area (Monterrey_ZMM, Guadalajara_ZMG, CDMX_ZM)
+- `zone=`: Geographic area
 - `ingest_date=`: When data was ingested (enables incremental processing)
 - `sensor_id=`: Individual sensor identifier
+- `location_id=`: Monitoring station identifier
 
 **Why Bronze Layer?**
 - **Raw, immutable**: Exact API responses preserved
@@ -430,116 +415,118 @@ s3://{bucket_name}/{prefix}/
 
 ---
 
+### **Sample Data Included**
+
+This repository includes real Bronze layer data for validation and reference:
+
+**Dataset Details:**
+- **Zone**: Guadalajara_Metropolitan
+- **Period**: 2025-09-20 to 2025-10-10 (20 days)
+- **Locations**: 23 monitoring stations
+- **Active Sensors**: 77 (filtered from 147 total sensors)
+- **Parameters**: 8 air quality metrics
+  - CO (Carbon Monoxide) - ppm
+  - NO (Nitric Oxide) - ppm
+  - NO₂ (Nitrogen Dioxide) - ppm
+  - NOx (Nitrogen Oxides) - ppm
+  - O₃ (Ozone) - ppm
+  - PM10 (Particulate Matter 10µm) - µg/m³
+  - PM2.5 (Particulate Matter 2.5µm) - µg/m³
+  - SO₂ (Sulfur Dioxide) - ppm
+
+**Location:**
+```
+bronze/zone=Guadalajara_Metropolitan/
+├── measurements/ingest_date=2025-11-22/
+│   ├── sensor_id=22933/page-1.json
+│   ├── sensor_id=23291/page-1.json
+│   └── ... 
+└── metadata/ingest_date=2025-11-22/
+    ├── locations_index.json          # 23 locations
+    ├── sensors_index.json             # 147 sensors (all)
+    └── sensors_by_location/
+        ├── location_id=7719.json
+        ├── location_id=7855.json
+        └── ... 
+```
+
+**Use Cases:**
+- Validate Bronze layer structure
+- Test downstream Silver/Gold transformations
+- Understand real OpenAQ API response formats
+- Example for documentation and onboarding
+
+---
+
 ### **JSON File Examples**
 
 The following examples show the actual content structure of the JSON files stored in the Bronze layer:
 
-**Locations Index (`metadata/ingest_date=2025-11-14/locations_index.json`):**
+**Locations Index (`metadata/ingest_date={YYYY-MM-DD}/locations_index.json`):**
 ```json
 {
   "locations": [
     {
-      "id": 10666,
-      "name": "Obispado",
+      "id": {location_id},
+      "name": "{location_name}",
       "coordinates": {
-        "latitude": 25.6864,
-        "longitude": -100.3364
-      }
-    },
-    {
-      "id": 10710,
-      "name": "Santa Catarina",
-      "coordinates": {
-        "latitude": 25.6742,
-        "longitude": -100.4589
+        "latitude": {latitude},
+        "longitude": {longitude}
       }
     }
   ]
 }
 ```
 
-**Sensors for Location (`metadata/ingest_date=2025-11-14/sensors_loc-10666.json`):**
+**Sensors for Location (`metadata/ingest_date={YYYY-MM-DD}/sensors_by_location/location_id={location_id}.json`):**
 ```json
 {
-  "location_id": 10666,
+  "location_id": {location_id},
   "sensors": [
     {
-      "id": 22803,
-      "name": "PM2.5",
+      "id": {sensor_id},
+      "name": "{parameter_name}",
       "parameter": {
-        "id": 2,
-        "name": "pm25",
-        "units": "µg/m³"
-      }
-    },
-    {
-      "id": 22804,
-      "name": "PM10",
-      "parameter": {
-        "id": 1,
-        "name": "pm10",
-        "units": "µg/m³"
+        "id": {parameter_id},
+        "name": "{parameter}",
+        "units": "{units}"
       }
     }
   ]
 }
 ```
 
-**Measurements Page (`measurements/pages/ingest_date=2025-11-14/sensor_id=22803/page-1.json`):**
+**Measurements Page (`measurements/ingest_date={YYYY-MM-DD}/sensor_id={sensor_id}/page-N.json`):**
 ```json
 {
   "meta": {
-    "found": 350,
+    "found": {total_records},
     "limit": 1000,
-    "page": 1
+    "page": {page_number}
   },
   "results": [
     {
       "period": {
-        "label": "2025-10-01 00:00:00+00 - 2025-10-01 01:00:00+00",
+        "label": "{datetime_from} - {datetime_to}",
         "datetimeFrom": {
-          "utc": "2025-10-01T00:00:00Z",
-          "local": "2025-09-30T18:00:00-06:00"
+          "utc": "{utc_datetime}",
+          "local": "{local_datetime}"
         },
         "datetimeTo": {
-          "utc": "2025-10-01T01:00:00Z",
-          "local": "2025-09-30T19:00:00-06:00"
+          "utc": "{utc_datetime}",
+          "local": "{local_datetime}"
         }
       },
-      "value": 42.5,
+      "value": {measurement_value},
       "parameter": {
-        "id": 2,
-        "name": "pm25",
-        "units": "µg/m³",
-        "displayName": "PM2.5"
+        "id": {parameter_id},
+        "name": "{parameter}",
+        "units": "{units}",
+        "displayName": "{display_name}"
       },
       "coordinates": {
-        "latitude": 25.6864,
-        "longitude": -100.3364
-      }
-    },
-    {
-      "period": {
-        "label": "2025-10-01 01:00:00+00 - 2025-10-01 02:00:00+00",
-        "datetimeFrom": {
-          "utc": "2025-10-01T01:00:00Z",
-          "local": "2025-09-30T19:00:00-06:00"
-        },
-        "datetimeTo": {
-          "utc": "2025-10-01T02:00:00Z",
-          "local": "2025-09-30T20:00:00-06:00"
-        }
-      },
-      "value": 38.2,
-      "parameter": {
-        "id": 2,
-        "name": "pm25",
-        "units": "µg/m³",
-        "displayName": "PM2.5"
-      },
-      "coordinates": {
-        "latitude": 25.6864,
-        "longitude": -100.3364
+        "latitude": {latitude},
+        "longitude": {longitude}
       }
     }
   ]
@@ -616,8 +603,8 @@ The following examples show the actual content structure of the JSON files store
 
 ```bash
 # System auto-detects S3 if AWS_S3_BUCKET_NAME is in .env
-python -m src.openaq_ingestion.main \
-  --zone Monterrey_ZMM \
+python -m src.main \
+  --zone Monterrey_Metropolitan \
   --from 2025-09-01T00:00:00Z \
   --to 2025-10-15T23:59:59Z
 ```
@@ -626,16 +613,16 @@ python -m src.openaq_ingestion.main \
 
 ```bash
 # Force local storage (even if S3 configured)
-python -m src.openaq_ingestion.main \
+python -m src.main \
   --storage local \
-  --zone Guadalajara_ZMG \
+  --zone Guadalajara_Metropolitan \
   --from 2025-10-01T00:00:00Z \
   --to 2025-10-31T23:59:59Z
 
 # Force S3 storage
-python -m src.openaq_ingestion.main \
+python -m src.main \
   --storage s3 \
-  --zone CDMX_ZM \
+  --zone CDMX_Metropolitan \
   --from 2025-11-01T00:00:00Z \
   --to 2025-11-30T23:59:59Z
 ```
@@ -644,7 +631,7 @@ python -m src.openaq_ingestion.main \
 
 ```bash
 # Extract all zones defined in zones_config.json
-python -m src.openaq_ingestion.main \
+python -m src.main \
   --from 2025-09-01T00:00:00Z \
   --to 2025-10-15T23:59:59Z
 ```
@@ -653,7 +640,7 @@ python -m src.openaq_ingestion.main \
 
 ```bash
 # Use custom zones configuration file
-python -m src.openaq_ingestion.main \
+python -m src.main \
   --zones ./custom_zones.json \
   --from 2025-09-01T00:00:00Z \
   --to 2025-10-15T23:59:59Z
@@ -664,10 +651,10 @@ python -m src.openaq_ingestion.main \
 | Option | Description | Required | Default |
 |--------|-------------|----------|---------|
 | `--storage` | Storage backend: `local` or `s3` | No | Auto-detect from `.env` |
-| `--zone` | Specific zone name (e.g., 'Monterrey_ZMM') | No | All zones |
+| `--zone` | Specific zone name (e.g., 'Monterrey_Metropolitan') | No | All zones |
 | `--from` | Start date/time in ISO format | Yes | - |
 | `--to` | End date/time in ISO format | Yes | - |
-| `--zones` | Path to zones configuration file | No | `src/scripts/zones_config.json` |
+| `--zones` | Path to zones configuration file | No | `src/ingestion/openaq/configs/zones_config.json` |
 | `--out` | Base output directory (local storage) | No | `./bronze` |
 
 ---
@@ -682,16 +669,16 @@ Defines geographic areas to extract data from using bounding boxes:
 {
   "zones": [
     {
-      "name": "Monterrey_ZMM",
+      "name": "Monterrey_Metropolitan",
       "bbox": [-100.6, 25.5, -99.95, 25.85]
     },
     {
-      "name": "Guadalajara_ZMG",
+      "name": "Guadalajara_Metropolitan",
       "bbox": [-103.5, 20.5, -103.2, 20.8]
     },
     {
-      "name": "CDMX_ZM",
-      "bbox": [-99.35, 19.25, -98.95, 19.55]
+      "name": "CDMX_Metropolitan",
+      "bbox": [-99.35, 19.15, -98.95, 19.65]
     }
   ]
 }
@@ -733,7 +720,7 @@ source .venv/bin/activate
 python -c "from dotenv import load_dotenv; import os; load_dotenv(); print('S3 Bucket:', os.getenv('AWS_S3_BUCKET_NAME'))"
 
 # Test 2: Storage mode detection
-python -c "from src.openaq_ingestion.core.config import storage_mode; print('Storage mode:', storage_mode())"
+python -c "from src.ingestion.openaq.configs.settings import storage_mode; print('Storage mode:', storage_mode())"
 
 # Test 3: AWS connectivity (S3 only)
 python -c "import boto3; s3=boto3.client('s3'); print('S3 buckets:', [b['Name'] for b in s3.list_buckets()['Buckets']])"
@@ -745,9 +732,9 @@ Test with a small date range first:
 
 ```bash
 # Test single day
-python -m src.openaq_ingestion.main \
+python -m src.main \
   --storage local \
-  --zone Monterrey_ZMM \
+  --zone Monterrey_Metropolitan \
   --from 2025-10-01T00:00:00Z \
   --to 2025-10-01T23:59:59Z
 ```

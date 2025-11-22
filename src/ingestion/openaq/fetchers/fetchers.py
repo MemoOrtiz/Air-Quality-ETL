@@ -1,0 +1,42 @@
+# src/ingestion/openaq/fetchers/fetchers.py
+import os, json
+from .http_client import get
+from ..configs.settings import api_base, PAGE_LIMIT_DEFAULT
+
+def fetch_locations_bbox(bbox: tuple, limit=PAGE_LIMIT_DEFAULT):
+    lonW, latS, lonE, latN = bbox
+    page, results = 1, []
+    while True:
+        params = {"bbox": f"{lonW},{latS},{lonE},{latN}", "limit": limit, "page": page}
+        r = get(f"{api_base()}/locations", params=params)
+        chunk = r.json().get("results", [])
+        results.extend(chunk)
+        if len(chunk) < limit: break
+        page += 1
+    return results
+
+def fetch_sensors_by_location(location_id: int, limit=PAGE_LIMIT_DEFAULT):
+    page, sensors = 1, []
+    while True:
+        r = get(f"{api_base()}/locations/{location_id}/sensors", params={"limit": limit, "page": page})
+        chunk = r.json().get("results", [])
+        sensors.extend(chunk)
+        if len(chunk) < limit: break
+        page += 1
+    return sensors
+
+def fetch_measurements_for_sensor_raw(sensor_id: int, dt_from: str, dt_to: str, limit=PAGE_LIMIT_DEFAULT):
+    """Only fetch data, DO NOT save it"""
+    pages = []
+    page = 1
+    while True:
+        params = {"datetime_from": dt_from, "datetime_to": dt_to, "limit": limit, "page": page}
+        r = get(f"{api_base()}/sensors/{sensor_id}/measurements", params=params)
+        js = r.json()
+        results = js.get("results", [])
+        
+        pages.append(js)  # Accumulate pages in memory
+        
+        if len(results) < limit: break
+        page += 1
+    return pages  # Return all pages
