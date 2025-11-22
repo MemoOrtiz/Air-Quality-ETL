@@ -96,6 +96,9 @@ data-project/
 │   ├── transformation/
 │   └── aggregation/
 ├── bronze/                                  # Local data output (Bronze layer)
+│   └── zone=Guadalajara_Metropolitan/      # Sample data for validation
+│       ├── measurements/
+│       └── metadata/
 ├── tests/
 ├── .env
 ├── .gitignore
@@ -433,6 +436,49 @@ s3://{bucket_name}/{prefix}/
 
 ---
 
+### **Sample Data Included**
+
+This repository includes real Bronze layer data for validation and reference:
+
+**Dataset Details:**
+- **Zone**: Guadalajara_Metropolitan
+- **Period**: 2025-09-20 to 2025-10-10 (20 days)
+- **Locations**: 23 monitoring stations
+- **Active Sensors**: 77 (filtered from 147 total sensors)
+- **Parameters**: 8 air quality metrics
+  - CO (Carbon Monoxide) - ppm
+  - NO (Nitric Oxide) - ppm
+  - NO₂ (Nitrogen Dioxide) - ppm
+  - NOx (Nitrogen Oxides) - ppm
+  - O₃ (Ozone) - ppm
+  - PM10 (Particulate Matter 10µm) - µg/m³
+  - PM2.5 (Particulate Matter 2.5µm) - µg/m³
+  - SO₂ (Sulfur Dioxide) - ppm
+
+**Location:**
+```
+bronze/zone=Guadalajara_Metropolitan/
+├── measurements/ingest_date=2025-11-22/
+│   ├── sensor_id=22933/page-1.json
+│   ├── sensor_id=23291/page-1.json
+│   └── ... (77 sensors total)
+└── metadata/ingest_date=2025-11-22/
+    ├── locations_index.json          # 23 locations
+    ├── sensors_index.json             # 147 sensors (all)
+    └── sensors_by_location/
+        ├── location_id=7719.json
+        ├── location_id=7855.json
+        └── ... (23 files total)
+```
+
+**Use Cases:**
+- Validate Bronze layer structure
+- Test downstream Silver/Gold transformations
+- Understand real OpenAQ API response formats
+- Example for documentation and onboarding
+
+---
+
 ### **JSON File Examples**
 
 The following examples show the actual content structure of the JSON files stored in the Bronze layer:
@@ -461,7 +507,7 @@ The following examples show the actual content structure of the JSON files store
 }
 ```
 
-**Sensors for Location (`metadata/ingest_date=2025-11-14/sensors_loc-10666.json`):**
+**Sensors for Location (`metadata/ingest_date=2025-11-14/sensors_by_location/location_id=10666.json`):**
 ```json
 {
   "location_id": 10666,
