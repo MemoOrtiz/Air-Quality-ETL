@@ -47,9 +47,9 @@ class S3Storage(StorageInterface):
         self.save_json(path, {"results": locations})
         return True
 
-    def save_sensors_for_location(self, zone, loc_id, sensors, ingest_date):
+    def save_sensors_by_location(self, zone, loc_id, sensors, ingest_date):
         """Save sensors for a location to S3"""
-        path = f"{self.metadata_dir(zone, ingest_date)}/sensors_loc-{loc_id}.json"
+        path = f"{self.metadata_dir(zone, ingest_date)}/sensors_by_location/location_id={loc_id}.json"
         self.save_json(path, {"results": sensors})
         return True
 

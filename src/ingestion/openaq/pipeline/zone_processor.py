@@ -2,7 +2,7 @@
 from datetime import datetime
 from ..fetchers.fetchers import (
     fetch_locations_bbox,
-    fetch_sensors_for_location, 
+    fetch_sensors_by_location, 
     fetch_measurements_for_sensor_raw
 )
 from ..storage.storage_interface import StorageInterface
@@ -84,11 +84,11 @@ class ZoneProcessor:
             
             try:
                 # Obtain sensors using fetchers
-                sensors = fetch_sensors_for_location(loc_id)
+                sensors = fetch_sensors_by_location(loc_id)
                 print(f"      → {len(sensors)} sensors found")
                 
                 # Save sensors for this location using storage
-                self.storage.save_sensors_for_location(zone_name, loc_id, sensors, ingest_date)
+                self.storage.save_sensors_by_location(zone_name, loc_id, sensors, ingest_date)
                 
                 # Prepare consolidated index
                 for sensor in sensors:

@@ -15,7 +15,7 @@ def fetch_locations_bbox(bbox: tuple, limit=PAGE_LIMIT_DEFAULT):
         page += 1
     return results
 
-def fetch_sensors_for_location(location_id: int, limit=PAGE_LIMIT_DEFAULT):
+def fetch_sensors_by_location(location_id: int, limit=PAGE_LIMIT_DEFAULT):
     page, sensors = 1, []
     while True:
         r = get(f"{api_base()}/locations/{location_id}/sensors", params={"limit": limit, "page": page})

@@ -35,9 +35,9 @@ class LocalStorage(StorageInterface):
             return True  # created
         return False  # already exists
 
-    def save_sensors_for_location(self, zone, loc_id, sensors, ingest_date):
+    def save_sensors_by_location(self, zone, loc_id, sensors, ingest_date):
         """ Save sensors for a location if not exists """
-        p = os.path.join(self.metadata_dir(zone, ingest_date), f"sensors_loc-{loc_id}.json")
+        p = os.path.join(self.metadata_dir(zone, ingest_date), "sensors_by_location", f"location_id={loc_id}.json")
         if not os.path.exists(p):
             self.save_json(p, {"results": sensors})
             return True  # created

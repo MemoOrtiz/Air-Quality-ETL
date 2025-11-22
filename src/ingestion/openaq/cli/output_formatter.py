@@ -45,7 +45,7 @@ def print_final_summary(total_stats: dict, zones: list, output_dir: str, ingest_
         print(f"   │       └──  page-*.json")
         print(f"   └──  metadata/ingest_date={ingest_date}/")
         print(f"       ├──  locations_index.json")
-        print(f"       ├──  sensors_loc-*.json")
+        print(f"       ├──  sensors_by_location/location_id=*.json")
         print(f"       └──  sensors_index.json")
         print()
     
