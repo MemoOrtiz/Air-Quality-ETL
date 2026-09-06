@@ -90,7 +90,7 @@ Available zones: Monterrey_Metropolitan, CDMX_Metropolitan, Guadalajara_Metropol
         "--storage",
         choices=["local", "s3"],
         default=None,
-        help="Storage backend: 'local' for filesystem, 's3' for AWS S3. If not specified, auto-detects based on S3_BUCKET_NAME in .env"
+        help="Storage backend: 'local' for filesystem, 's3' for AWS S3. If not specified, auto-detects based on AWS_S3_BUCKET_NAME in .env"
     )
     
     return parser.parse_args()
