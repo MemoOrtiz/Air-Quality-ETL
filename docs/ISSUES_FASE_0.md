@@ -1,12 +1,32 @@
-# Issues — Phase 0 (to create manually on GitHub)
+# Issues — Phase 0
 
-> Text ready to copy/paste. One issue per pending deliverable. The `§`
-> references point to `docs/AirQuality_ETL_Master_Document.md`.
-> Suggested labels in parentheses on each title.
+> **Status: created.** All ten issues below live on GitHub as **#6–#15**, and
+> every label listed at the end exists in the repo. This file is kept as the
+> written record of their scope and acceptance criteria — the place to read what
+> an issue actually means without leaving the repository.
+>
+> The `§` references point to `docs/AirQuality_ETL_Master_Document.md`.
+> Labels in parentheses on each title.
+
+| Issue | Title | Decision |
+|---|---|---|
+| [#6](https://github.com/MemoOrtiz/Air-Quality-ETL/issues/6) | Storage: trim the contract to primitives | **D1** |
+| [#7](https://github.com/MemoOrtiz/Air-Quality-ETL/issues/7) | Create `src/common/paths.py` | — |
+| [#8](https://github.com/MemoOrtiz/Air-Quality-ETL/issues/8) | Silver layer — transformation | **D5** |
+| [#9](https://github.com/MemoOrtiz/Air-Quality-ETL/issues/9) | Gold layer — modeling | — |
+| [#10](https://github.com/MemoOrtiz/Air-Quality-ETL/issues/10) | Dockerize per stage | — |
+| [#11](https://github.com/MemoOrtiz/Air-Quality-ETL/issues/11) | CI pipeline (GitHub Actions) | — |
+| [#12](https://github.com/MemoOrtiz/Air-Quality-ETL/issues/12) | Proactive dual-window `RateLimiter` | **D4** |
+| [#13](https://github.com/MemoOrtiz/Air-Quality-ETL/issues/13) | Unify metadata writes to "always overwrite" | **D3** |
+| [#14](https://github.com/MemoOrtiz/Air-Quality-ETL/issues/14) | Remove latent Silver-like code from `ingestion/` | **D2** |
+| [#15](https://github.com/MemoOrtiz/Air-Quality-ETL/issues/15) | Bug: error message names the wrong env var | — |
+
+**Order of attack** (lowest to highest risk, one per session, per `CLAUDE.md`):
+#15 → #13 → #14 → #6 + #7 → #8.
 
 ---
 
-## 1. Storage: trim the contract to primitives + read methods (D1) `(enhancement, architecture)`
+## #6 — Storage: trim the contract to primitives + read methods (D1) `(enhancement, architecture)`
 
 **What it involves.** Trim `StorageInterface` to domain-agnostic primitives
 (`save_bytes`, `read_bytes`, `list_paths`, `exists`) with `save_json` as a helper
@@ -26,7 +46,7 @@ move out of the backend and up to the ingestion layer, with paths computed by
 
 ---
 
-## 2. Create `src/common/paths.py` (shared path contract) `(enhancement, architecture)`
+## #7 — Create `src/common/paths.py` (shared path contract) `(enhancement, architecture)`
 
 **What it involves.** Neutral module that Bronze, Silver, and Gold all import
 from to compute Hive-style paths. Couples the stages to a stable third party,
@@ -42,7 +62,7 @@ not to each other.
 
 ---
 
-## 3. Silver layer — transformation (`src/transformation/`) `(enhancement, silver)`
+## #8 — Silver layer — transformation (`src/transformation/`) `(enhancement, silver)`
 
 **What it involves.** Create the Silver layer: read all `ingest_date=`
 partitions from Bronze, flatten the `page-N.json` files, clean, deduplicate
@@ -62,7 +82,7 @@ partitions from Bronze, flatten the `page-N.json` files, clean, deduplicate
 
 ---
 
-## 4. Gold layer — modeling (`src/aggregation/`) `(enhancement, gold)`
+## #9 — Gold layer — modeling (`src/aggregation/`) `(enhancement, gold)`
 
 **What it involves.** Dimensional modeling on top of Silver: `fact_measurements`
 plus dimensions (`dim_sensor`, `dim_location`, `dim_parameter`, `dim_date`) and
@@ -78,7 +98,7 @@ aggregates by parameter/zone/day/hour. Its own entry point and Dockerfile.
 
 ---
 
-## 5. Dockerize per stage `(enhancement, infra)`
+## #10 — Dockerize per stage `(enhancement, infra)`
 
 **What it involves.** `requirements/` split per stage, one Dockerfile per stage
 with selective `COPY`, `.dockerignore`, `ENTRYPOINT` with passable args.
@@ -93,7 +113,7 @@ with selective `COPY`, `.dockerignore`, `ENTRYPOINT` with passable args.
 
 ---
 
-## 6. CI pipeline (GitHub Actions) `(enhancement, ci)`
+## #11 — CI pipeline (GitHub Actions) `(enhancement, ci)`
 
 **What it involves.** Workflows: tests on every push; `bronze-daily` with the
 build-once-push pattern to `ghcr.io`, matrix per zone, `fail-fast: false`,
@@ -110,7 +130,7 @@ build-once-push pattern to `ghcr.io`, matrix per zone, `fail-fast: false`,
 
 ---
 
-## 7. Proactive dual-window RateLimiter (D4) `(enhancement, rate-limiting)`
+## #12 — Proactive dual-window RateLimiter (D4) `(enhancement, rate-limiting)`
 
 **What it involves.** Replace `sleep_by_rate` (reactive) with a proactive
 `RateLimiter` (deque + lock, 55/min and 1900/hour) shared across threads, with
@@ -129,7 +149,7 @@ fetchers' signature to receive the limiter. Prerequisite for
 
 ---
 
-## 8. Unify metadata writes to "always overwrite" — fix `LocalStorage` (D3) `(bug, storage)`
+## #13 — Unify metadata writes to "always overwrite" — fix `LocalStorage` (D3) `(bug, storage)`
 
 **What it involves.** Today `LocalStorage` **skips** writing if the metadata
 file already exists (`skip-if-exists`), while `S3Storage` always overwrites.
@@ -145,7 +165,7 @@ always overwrites, like S3.
 
 ---
 
-## 9. Remove latent Silver-like code from `ingestion/` (D2) `(refactor, cleanup)`
+## #14 — Remove latent Silver-like code from `ingestion/` (D2) `(refactor, cleanup)`
 
 **What it involves.** Remove from the ingestion layer the `event_date` grouping
 code (currently disabled/commented out): `LocalStorage.measurements_event_date_dir()`,
@@ -163,7 +183,7 @@ The logic is recoverable from git (`git show 1062792:…`) as a seed when buildi
 
 ---
 
-## 10. Bug: error message uses `S3_BUCKET_NAME` instead of `AWS_S3_BUCKET_NAME` `(bug, good first issue)`
+## #15 — Bug: error message uses `S3_BUCKET_NAME` instead of `AWS_S3_BUCKET_NAME` `(bug, good first issue)`
 
 **What it involves.** In `src/ingestion/openaq/pipeline/orchestrator.py` (~L34-35)
 the error message says `S3_BUCKET_NAME`, but the variable actually read (via
@@ -178,7 +198,9 @@ confusing. Align the message with the actual variable name.
 
 ---
 
-## Labels to create in the repo
+## Labels
+
+All nine already exist in the repo, alongside GitHub's defaults.
 
 | Label | Description |
 |---|---|
@@ -193,3 +215,11 @@ confusing. Align the message with the actual variable name.
 | `cleanup` | Code removal or simplification, no new behavior |
 
 `bug`, `enhancement`, and `good first issue` ship with GitHub by default.
+
+---
+
+## Open pull requests
+
+| PR | Closes | Note |
+|---|---|---|
+| [#16](https://github.com/MemoOrtiz/Air-Quality-ETL/pull/16) | #15 | External contribution (fork `slegarraga`). Targets `main` directly instead of `dev`, and fixes only `orchestrator.py` — the `S3_BUCKET_NAME` mention in `argument_parser.py:93` is still there. |
