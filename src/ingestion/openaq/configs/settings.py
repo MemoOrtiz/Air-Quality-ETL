@@ -62,6 +62,6 @@ def s3_prefix():
 def storage_mode():
     """
     Determine storage mode based on S3 configuration
-    Returns: 's3' if S3_BUCKET_NAME is configured, 'local' otherwise
+    Returns: 's3' if AWS_S3_BUCKET_NAME is configured, 'local' otherwise
     """
     return "s3" if s3_bucket() else "local"

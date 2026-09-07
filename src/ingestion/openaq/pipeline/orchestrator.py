@@ -31,8 +31,8 @@ class DataIngestionOrchestrator:
             bucket = s3_bucket()
             if not bucket:
                 raise ValueError(
-                    "S3 storage selected but S3_BUCKET_NAME not configured in .env\n"
-                    "Add: S3_BUCKET_NAME=your-bucket-name"
+                    "S3 storage selected but AWS_S3_BUCKET_NAME not configured in .env\n"
+                    "Add: AWS_S3_BUCKET_NAME=your-bucket-name"
                 )
             prefix = s3_prefix()
             print(f"Storage mode: S3 (bucket: {bucket}, prefix: {prefix})")

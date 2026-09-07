@@ -43,3 +43,10 @@ Thumbs.db
 # Otros
 others/
 raw/
+# Claude Code config (local workflow guardrails, no es del proyecto)
+.claude/
+
+# Notas personales, no destinadas al repo
+docs/Guia_GitHub_Issues.md
+docs/Handoff_Claude_Code_AirQuality.md
+docs/AirQuality_ETL_Documento_Maestro.md

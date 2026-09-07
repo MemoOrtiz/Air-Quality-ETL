@@ -27,29 +27,22 @@ class LocalStorage(StorageInterface):
             json.dump(data, f, ensure_ascii=False)
 
     def save_locations_index(self, zone, locations, ingest_date):
-        """ Save locations index if not exists """
+        """ Save locations index, always overwriting (same as S3Storage) """
         p = os.path.join(self.metadata_dir(zone, ingest_date), "locations_index.json")
-        # Only if it doesn't exist
-        if not os.path.exists(p):
-            self.save_json(p, {"results": locations})
-            return True  # created
-        return False  # already exists
+        self.save_json(p, {"results": locations})
+        return True
 
     def save_sensors_by_location(self, zone, loc_id, sensors, ingest_date):
-        """ Save sensors for a location if not exists """
+        """ Save sensors for a location, always overwriting (same as S3Storage) """
         p = os.path.join(self.metadata_dir(zone, ingest_date), "sensors_by_location", f"location_id={loc_id}.json")
-        if not os.path.exists(p):
-            self.save_json(p, {"results": sensors})
-            return True  # created
-        return False  # already exists
+        self.save_json(p, {"results": sensors})
+        return True
 
     def save_sensors_index(self, zone, sensors_idx, ingest_date):
-        """ Save sensors index if not exists """
+        """ Save sensors index, always overwriting (same as S3Storage) """
         p = os.path.join(self.metadata_dir(zone, ingest_date), "sensors_index.json")
-        if not os.path.exists(p):
-            self.save_json(p, sensors_idx)
-            return True  # created
-        return False  # already exists
+        self.save_json(p, sensors_idx)
+        return True
     
     # New methods for date-based directories
     def measurements_dir(self, zone, sensor_id, ingest_date):
