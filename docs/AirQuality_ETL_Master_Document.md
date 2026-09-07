@@ -20,7 +20,8 @@
 | New | §3.7 — Code details v3 did not cover (`_filter_active_sensors`, latent `event_date` logic, HTTP retries) |
 | New | §8.0 — Rate limiting **that already exists** in `http_client` (header-based + 429 retry) |
 | New | §17 — Pending decisions (v4): D1–D4, arising from auditing the real code |
-| Resolved | §17 — **D1–D4 decided + D5 added (2026-08-03)**; adjustments in §3.2, §5.5 (D1), §9.1 (D3), §8.0/§8.3 (D4), §9.3–§9.4 (D5). Decisions made; implementation in `src/` still pending |
+| Resolved | §17 — **D1–D4 decided + D5 added (2026-08-03)**; adjustments in §3.2, §5.5 (D1), §9.1 (D3), §8.0/§8.3 (D4), §9.3–§9.4 (D5) |
+| Implemented | **2026-09-06** — first changes to `src/` since November 2025: the `AWS_S3_BUCKET_NAME` message (#15) and **D3** (#13, §9.1 and §17·D3). **D1, D2, D4 and D5 remain unimplemented.** The test suite is born with D3 (§10) |
 | Note | §16 — v3 could not read the code; v4 could. The warning was updated |
 
 ### Changes in v3
@@ -219,7 +220,7 @@ def storage_mode():
 
 Precedence: **`--storage` flag > autodetection via `.env`**.
 
-> Note on the code: the error message in `orchestrator._initialize_storage()` mentions `S3_BUCKET_NAME`, but the variable actually read is `AWS_S3_BUCKET_NAME` (via `settings.s3_bucket()`). It is a cosmetic inconsistency in the error text, not in the logic.
+> ~~Note on the code: the error message in `orchestrator._initialize_storage()` mentions `S3_BUCKET_NAME`, but the variable actually read is `AWS_S3_BUCKET_NAME` (via `settings.s3_bucket()`).~~ **Fixed on 2026-09-06** (#15, commit `0c00e34`), in both `orchestrator.py` and the `argument_parser.py` help text.
 
 ### 3.4 Zones
 
@@ -1192,12 +1193,16 @@ os.makedirs(path, exist_ok=True)    # ← equivalent to the fix; already present
 | Case | Real behavior | Idempotent? |
 |---|---|---|
 | Re-run on the **same day**, same range — **measurements** | Same paths → **overwrites** (`open('w')` / `put_object`) | Yes |
-| Re-run on the **same day** — **metadata** (`locations_index`, `sensors_by_location`, `sensors_index`) | **Today:** `LocalStorage` **skips if the file already exists**; `S3Storage` **always overwrites**. **D3 (§17): unify to "always overwrite"** — fix `LocalStorage` so it does not skip | Divergent today → idempotent once unified (fix pending in code) |
+| Re-run on the **same day** — **metadata** (`locations_index`, `sensors_by_location`, `sensors_index`) | Both backends **always overwrite** (**D3**, applied 2026-09-06). Until then `LocalStorage` skipped the write if the file existed | Yes |
 | Run on **another day**, overlapping range | A different `ingest_date=` partition → the same measurement exists twice | Yes, by design |
 
-> **Corrected in v4.** Overwriting is not uniform: locally, metadata is written *only if it does not exist*; on S3, it is always overwritten. The same logical operation behaves differently depending on the backend.
+> **Corrected in v4.** Overwriting was not uniform: locally, metadata was written *only if it did not exist*; on S3, always overwritten. The same logical operation behaved differently depending on the backend.
 >
-> **Resolved — D3 (§17): unify to "always overwrite".** Bronze's immutability is guaranteed by **partitioning by `ingest_date=`**, not by refusing to overwrite an individual file inside a partition. "Skip if exists" **breaks idempotency** (the result depends on whether you already ran that day) and **diverges between local and S3**, which contradicts the principle in **§6.1** (same artifact on laptop and in the cloud). Fix: `LocalStorage` must stop skipping; `S3Storage` already has the correct behavior. *(Pending application in the code.)*
+> **Resolved — D3 (§17): unify to "always overwrite".** Bronze's immutability is guaranteed by **partitioning by `ingest_date=`**, not by refusing to overwrite an individual file inside a partition. "Skip if exists" **breaks idempotency** (the result depends on whether you already ran that day) and **diverges between local and S3**, which contradicts the principle in **§6.1** (same artifact on laptop and in the cloud).
+>
+> **Applied on 2026-09-06** (#13). The three guards in `local_filesystem.py:29-45` are gone; the methods now mirror `s3_storage.py:44-60`. `S3Storage` was already correct and was not touched.
+>
+> **The decisive case is not theoretical.** `ZoneProcessor._process_sensors` swallows per-location errors and continues (`zone_processor.py:108-110`), so a run with API failures still writes `sensors_index.json` with an incomplete catalog — and reports success. Under "skip if exists" a corrective re-run **could not repair it**: the bad file stayed frozen until the `ingest_date=` partition rolled over the next day. On S3 the same scenario healed itself. Local could not be repaired and the cloud could — that is what D3 fixes. The silent failure that produces the incomplete catalog is a separate problem, tracked in **#17**.
 
 The third case is the audit log working as intended. **Bronze is append-only and immutable.** If it is cleaned, replayability is lost, which is its only reason to exist.
 
@@ -1248,6 +1253,17 @@ When writing by `event_date`, one run touches old partitions. With a full rebuil
 The **already-committed Guadalajara sample data is the fixture library.** That turns a previously questionable decision into an asset.
 
 **`FakeStorage` is not used.** `LocalStorage` pointing at a temporary directory is already the test double — it runs the full pipeline without AWS, without credentials and at no cost. That is exactly why the abstraction was designed.
+
+> **Suite born on 2026-09-06** with D3 (#13). Layout: `tests/` mirrors the stages
+> of `src/` (`tests/ingestion/`, later `tests/transformation/`, `tests/aggregation/`),
+> so each stage keeps its tests isolated — the same rule as **R1**. Tests live
+> **outside** `src/` so they do not travel into the deployment artifact (#10).
+> `pytest.ini` sets `pythonpath = .` because `src/` has no `__init__.py`; without
+> it the suite passes under `python -m pytest` and fails under plain `pytest`,
+> which would break CI (#11) for no real reason.
+>
+> First test in place: `tests/ingestion/test_local_storage_overwrite.py` — the
+> Bronze row of the table below, in its metadata-writer slice.
 
 | Stage | What is tested | How |
 |---|---|---|
@@ -1599,7 +1615,7 @@ Pick **one** according to the goal:
 - [x] Silver partitions by `event_date`
 - [x] Silver does a **full rebuild** by default, **overwrite by partition** → idempotency by construction (**D5**)
 - [x] Incremental `--ingest-date` mode as a future optimization (watermark; Delta/Iceberg/Hudi at larger scale — **D5**)
-- [ ] Unify metadata write semantics to "always overwrite" (fix `LocalStorage`) — **D3 resolved**
+- [x] Unify metadata write semantics to "always overwrite" (fix `LocalStorage`) — **D3 implemented 2026-09-06**
 
 ### Tests
 - [x] They will be done (author's decision)
@@ -1663,7 +1679,9 @@ Pick **one** according to the goal:
 
 > These decisions arose from **reading the real code** and contrasting it with what the documentation assumed. They are not facts to correct (those were already corrected in the text above): they are **design choices** that are yours to make. Each has a stable ID (D1, D2, …) so you can answer in future messages with "D1: option B" or similar.
 >
-> **Update 2026-08-03.** D1–D4 resolved by the author; **D5** was added (also resolved) about Silver's reprocessing strategy. The **My decision** field of each one reflects the choice made. The affected sections were adjusted accordingly: §3.2 and §5.5 (D1), §9.1 (D3), §8.0/§8.3 (D4), §9.3–§9.4 (D5). **The decisions are made; the implementation in `src/` is still pending.**
+> **Update 2026-08-03.** D1–D4 resolved by the author; **D5** was added (also resolved) about Silver's reprocessing strategy. The **My decision** field of each one reflects the choice made. The affected sections were adjusted accordingly: §3.2 and §5.5 (D1), §9.1 (D3), §8.0/§8.3 (D4), §9.3–§9.4 (D5).
+>
+> **Update 2026-09-06.** **D3 is implemented** (#13). **D1, D2, D4 and D5 are still only decisions** — the code has not been touched for them.
 
 ### D1 — Scope of the `StorageInterface` contract
 
@@ -1717,8 +1735,8 @@ Pick **one** according to the goal:
   - **Option A — Unify to "always overwrite" (like S3):** *(Trade-off: simple, predictable idempotency on both sides; you lose the "do not clobber" protection if two runs on the same day return different catalogs.)*
   - **Option B — Unify to "write-if-not-exists" (like local):** *(Trade-off: the day's first version stays immutable, good for auditing; but on S3 you must add a prior `head_object`, and a run with a corrected catalog would not be reflected without deleting first.)*
   - **Option C — Make it configurable** (an `--overwrite-metadata` flag with an explicit default): *(Trade-off: flexible and honest, but it adds CLI surface and one more branch to test.)*
-- **My decision: Option A — unify to "always overwrite" on both backends.**
-  - **`LocalStorage` must be fixed** so it **stops skipping** when the metadata file already exists (today it returns `False` and does not rewrite). `S3Storage` already behaves that way (unconditional `put_object`); it is the one that is right.
+- **My decision: Option A — unify to "always overwrite" on both backends.** ✅ **Implemented on 2026-09-06** (#13): the three guards in `local_filesystem.py:29-45` removed, covered by `tests/ingestion/test_local_storage_overwrite.py`.
+  - **`LocalStorage` was fixed** so it **stops skipping** when the metadata file already exists (it used to return `False` and not rewrite). `S3Storage` already behaved that way (unconditional `put_object`); it was the one that was right, and it was not touched.
   - **Reason (documented in §9):** Bronze's immutability comes from **partitioning by `ingest_date=`**, not from refusing to overwrite an individual file inside a partition. "Skip if exists":
     - **breaks idempotency** — the result of a run depends on whether you already ran that day;
     - **diverges between local and S3**, which contradicts the principle of **§6.1** ("it is not Docker on my laptop *or* ECS; it is the same artifact running on both sides").
@@ -1761,4 +1779,4 @@ Pick **one** according to the goal:
 
 ---
 
-*Document v4 — updated on August 3, 2026. First version verified by direct reading of the source code. The objective corrections are applied in the text and the five architecture decisions of §17 (**D1–D5**) were **resolved** at the design level. **Implementation in `src/` is still pending: the code has not been modified** — trimming the `StorageInterface` contract (D1), removing the latent code from `ingestion/` (D2), fixing `LocalStorage` (D3) and replacing `sleep_by_rate` (D4) are later work not yet executed. The rest consolidates decisions recorded between October 2025 and August 2026.*
+*Document v4.1 — updated on September 6, 2026. First version verified by direct reading of the source code. The objective corrections are applied in the text and the five architecture decisions of §17 (**D1–D5**) were **resolved** at the design level. **`src/` was modified for the first time since November 2025:** the `AWS_S3_BUCKET_NAME` message (#15) and **D3** (#13), which also brings the first tests into the repository. **D1, D2, D4 and D5 remain pending in the code** — trimming the `StorageInterface` contract (D1), removing the latent code from `ingestion/` (D2) and replacing `sleep_by_rate` (D4) are later work not yet executed. The rest consolidates decisions recorded between October 2025 and August 2026.*

@@ -5,6 +5,10 @@
 > written record of their scope and acceptance criteria — the place to read what
 > an issue actually means without leaving the repository.
 >
+> **Progress (2026-09-06).** **#15** and **#13** are implemented on `dev` and
+> waiting for the pull request into `main` that will close them. **#17** was
+> added after Phase 0 was drafted; it is not part of the original ten.
+>
 > The `§` references point to `docs/AirQuality_ETL_Master_Document.md`.
 > Labels in parentheses on each title.
 
@@ -20,6 +24,7 @@
 | [#13](https://github.com/MemoOrtiz/Air-Quality-ETL/issues/13) | Unify metadata writes to "always overwrite" | **D3** |
 | [#14](https://github.com/MemoOrtiz/Air-Quality-ETL/issues/14) | Remove latent Silver-like code from `ingestion/` | **D2** |
 | [#15](https://github.com/MemoOrtiz/Air-Quality-ETL/issues/15) | Bug: error message names the wrong env var | — |
+| [#17](https://github.com/MemoOrtiz/Air-Quality-ETL/issues/17) | Structured logging and visible swallowed errors | — |
 
 **Order of attack** (lowest to highest risk, one per session, per `CLAUDE.md`):
 #15 → #13 → #14 → #6 + #7 → #8.
@@ -157,11 +162,17 @@ This breaks idempotency and diverges by backend. Fix `LocalStorage` so it
 always overwrites, like S3.
 
 **Acceptance criteria**
-- [ ] `LocalStorage` overwrites metadata even if the file exists
-- [ ] Identical behavior between local and S3 on same-day re-runs
-- [ ] Note/test confirming idempotency
+- [x] `LocalStorage` overwrites metadata even if the file exists
+- [x] Identical behavior between local and S3 on same-day re-runs
+- [x] Note/test confirming idempotency
 
 **v4 reference:** §9.1, §17·D3
+
+**Done on `dev`.** The three guards in `local_filesystem.py` are gone; the
+methods now mirror `s3_storage.py:44-60`. `tests/ingestion/test_local_storage_overwrite.py`
+covers all three writers and fails against the pre-fix code. The boolean return
+stays as `True` only to match S3 — it is dead code (`zone_processor.py:68`, `:91`,
+`:113` discard it) and is removed in **#6**, when these methods move up a layer.
 
 ---
 
@@ -191,10 +202,51 @@ the error message says `S3_BUCKET_NAME`, but the variable actually read (via
 confusing. Align the message with the actual variable name.
 
 **Acceptance criteria**
-- [ ] The error message names `AWS_S3_BUCKET_NAME`
-- [ ] The `Add: …` line suggests `AWS_S3_BUCKET_NAME=your-bucket-name`
+- [x] The error message names `AWS_S3_BUCKET_NAME`
+- [x] The `Add: …` line suggests `AWS_S3_BUCKET_NAME=your-bucket-name`
 
 **v4 reference:** §3.3 (code note)
+
+**Done on `dev`** in commit `0c00e34`, which covers **both** occurrences:
+`orchestrator.py` and the `argument_parser.py` help text. First change to `src/`
+since November 2025.
+
+---
+
+## #17 — Structured logging and visible swallowed errors `(enhancement, infra)`
+
+> Added on 2026-09-06, after Phase 0 was drafted. Found while resolving #13.
+
+**What it involves.** There is no `logging` anywhere in `src/`: 82 `print()`
+calls across six files (`output_formatter.py` 36, `zone_processor.py` 25,
+`orchestrator.py` 11, `config_loader.py` 6, `main.py` 2, `http_client.py` 2).
+With `print()` there are no severity levels, no timestamps, everything is mixed
+into stdout, and there is no way to route output to a file or CloudWatch without
+capturing the whole stream. That is the difference between being able to
+diagnose a failed unattended run and not.
+
+The concrete trigger is worse than cosmetic. `ZoneProcessor._process_sensors`
+catches per-location exceptions, prints one line among forty and `continue`s
+(`zone_processor.py:108-110`) **without incrementing `zone_stats['errors']`**.
+A run where the API failed on three locations still writes an incomplete
+`sensors_index.json` and reports `Zone ... completed successfully`
+(`zone_processor.py:53`). The run lies about its own outcome.
+
+This blocks real production use, and it blocks **#11** (CI): a scheduled
+workflow whose only signal is unstructured stdout cannot be monitored.
+
+**Acceptance criteria**
+- [ ] A single logging setup (level configurable via env var), no `print()` left
+      on execution paths — the CLI's user-facing output in `output_formatter.py`
+      may stay as `print`, since it *is* the program's output, not diagnostics
+- [ ] Swallowed exceptions logged at `warning`/`error` **and** counted in
+      `zone_stats['errors']`
+- [ ] The end-of-run summary reports failed locations/sensors, so an incomplete
+      run cannot report success
+- [ ] Log lines carry timestamp, level and zone
+
+**Note.** Independent of #6 and #14; it can land before or after them. It is a
+prerequisite for #11 being useful.
 
 ---
 
@@ -222,4 +274,4 @@ All nine already exist in the repo, alongside GitHub's defaults.
 
 | PR | Closes | Note |
 |---|---|---|
-| [#16](https://github.com/MemoOrtiz/Air-Quality-ETL/pull/16) | #15 | External contribution (fork `slegarraga`). Targets `main` directly instead of `dev`, and fixes only `orchestrator.py` — the `S3_BUCKET_NAME` mention in `argument_parser.py:93` is still there. |
+| [#16](https://github.com/MemoOrtiz/Air-Quality-ETL/pull/16) | #15 | External contribution (fork `slegarraga`). Targets `main` directly instead of `dev`, and fixes only `orchestrator.py`. **Superseded:** commit `0c00e34` on `dev` fixes both occurrences, including the `argument_parser.py:93` help text the PR leaves untouched. To be closed with thanks. |

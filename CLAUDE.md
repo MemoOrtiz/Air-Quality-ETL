@@ -30,11 +30,20 @@ Verified against the filesystem, not inferred from documentation.
 | **Bronze** (`src/ingestion/openaq/`) | Functional |
 | **Silver** (`src/transformation/`) | **Does not exist** — not even as an empty folder |
 | **Gold** (`src/aggregation/`) | **Does not exist** |
-| Tests, Docker, CI, orchestration | Do not exist |
+| Tests | `tests/` + `pytest.ini` exist since 2026-09-06. **Only 3 tests**, covering D3 |
+| Docker, CI, orchestration | Do not exist |
 
-`src/` **has not been modified since November 2025** (v1.0.0, 78 commits). All
-progress during 2026 has been documentation. If a document makes something
-sound implemented, verify it against the code before believing it.
+`src/` went **untouched from November 2025 until September 2026** (v1.0.0, 78
+commits); all progress in between was documentation. The block broke on
+**2026-09-06** with #15 (`0c00e34`) and #13 (D3). Everything else in `src/` is
+still the November 2025 code. If a document makes something sound implemented,
+verify it against the code before believing it.
+
+**Tests live outside `src/`**, in a tree that mirrors the stages
+(`tests/ingestion/`, and later `tests/transformation/`, `tests/aggregation/`), so
+they do not travel into the deployment artifact and each stage stays isolated.
+`pytest.ini` sets `pythonpath = .` because `src/` has no `__init__.py`; without
+it the suite passes under `python -m pytest` and fails under plain `pytest`.
 
 ---
 
@@ -99,27 +108,36 @@ the deduplication key must be built from `sensor_id` +
 
 ---
 
-## Decisions D1–D5 — DECIDED, NOT IMPLEMENTED
+## Decisions D1–D5 — only D3 is implemented
 
-These are resolved at the design level in §17 of the master document. **The code
-has not been touched.** Do not assume any of them already exist.
+All five are resolved at the design level in §17 of the master document. **Only
+D3 exists in code.** Do not assume the other four do.
 
 | ID | Decision | Touches |
 |---|---|---|
+| **D3** | ✅ **DONE (2026-09-06, #13).** Unified to **always overwrite**: the three guards removed from `local_filesystem.py:29-45`, now mirroring `s3_storage.py:44-60`. Covered by `tests/ingestion/test_local_storage_overwrite.py` | `local_filesystem.py` |
 | **D1** | Trim `StorageInterface` to 4 domain-agnostic primitives (`save_bytes`, `read_bytes`, `list_paths`, `exists`) + `save_json` helper. The semantic OpenAQ methods, including `save_measurements_raw`, **move up** to the ingestion layer on top of `src/common/paths.py` | `storage_interface.py`, both backends, `zone_processor.py`, new `common/paths.py` |
 | **D2** | **Remove** the latent Silver-style code from `ingestion/`. Recoverable from git (`1062792`; introduced in `e278a88`). It is reused as a *reference* for Silver, not copied verbatim | `local_filesystem.py`, `zone_processor.py` |
-| **D3** | Unify to **always overwrite**. Today `LocalStorage` skips metadata if the file exists while `S3Storage` overwrites — a divergence that breaks idempotency | `local_filesystem.py` |
 | **D4** | **Replace** `sleep_by_rate` with a proactive dual-window `RateLimiter` (55/min, 1900/hour). `acquire()` before **every** request, including pagination. Prerequisite for `ThreadPoolExecutor` | `http_client.py`, `fetchers.py` |
 | **D5** | Silver does a full rebuild, not incremental | (future) |
 
-**Agreed order for touching `src/` for the first time**, from lowest to highest
-risk, each in its own session:
+**Agreed order for touching `src/`**, from lowest to highest risk, each in its
+own session:
 
-1. Cosmetic bug: messages that say `S3_BUCKET_NAME` when the variable actually
-   read is `AWS_S3_BUCKET_NAME` (in `orchestrator.py` and in the
-   `argument_parser.py` help text). One line, a warm-up.
-2. **D3** — small and isolated. 3. **D2** — a clean deletion.
-4. **D1** — the largest, it rewrites the ABC. 5. **D4**.
+1. ~~Cosmetic bug: `S3_BUCKET_NAME` vs `AWS_S3_BUCKET_NAME`~~ — **done**, #15 (`0c00e34`)
+2. ~~**D3**~~ — **done**, #13
+3. **D2** (#14) — a clean deletion. ← **next**
+4. **#7** (`paths.py`) — must come **before** D1, which needs it
+5. **D1** (#6) — the largest, it rewrites the ABC
+6. **D4** (#12)
+
+`return True` in the three metadata writers is dead code kept only for S3
+parity. It gets removed in **D1**, when those methods move up a layer.
+
+**#17 — structured logging** (added 2026-09-06) is independent of the above and
+can land at any point. It matters: there is no `logging` in `src/`, and
+`zone_processor.py:108-110` swallows per-location errors without incrementing
+`zone_stats['errors']`, so an incomplete run reports success.
 
 ---
 

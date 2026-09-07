@@ -680,7 +680,7 @@ Stated openly, because each one is a trade-off rather than an oversight.
 | **Latent transformation code inside ingestion** | `LocalStorage` and `ZoneProcessor` contain disabled `event_date` grouping logic that writes JSONL. It is commented out, but it lives in the wrong layer; it will be removed and rebuilt inside Silver. |
 | **Small files** | One JSON per API page produces roughly 4,500 files per city per month. This hurts Spark and Athena, which spend more time opening files than reading them. Defensible in Bronze for immutability and replay, but worth naming. |
 | **Sequential execution** | A deliberate choice that respects the API rate limit. See [Rate Limiting](#rate-limiting-and-performance). |
-| **Cosmetic error-message bug** | Some messages refer to `S3_BUCKET_NAME` while the variable actually read is `AWS_S3_BUCKET_NAME`. The logic is correct; only the text is misleading. |
+| **No structured logging** | There is no `logging` in `src/`: 82 `print()` calls. Worse, `ZoneProcessor._process_sensors` swallows per-location errors without counting them, so a run that lost three locations still reports success. Tracked in [#17](https://github.com/MemoOrtiz/Air-Quality-ETL/issues/17). |
 
 ---
 
